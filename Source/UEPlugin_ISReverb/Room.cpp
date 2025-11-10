@@ -12,11 +12,20 @@ ARoom::ARoom()
 void ARoom::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	TArray<UChildActorComponent*> ChildActors;
+	GetComponents<UChildActorComponent>(ChildActors);
 
-	GetComponents<UReflectorSurface>(Surfaces);
+	for (UChildActorComponent* ChildActor : ChildActors)
+	{
+		if (ChildActor->IsA(AReflectorSurface::StaticClass()))
+		{
+			Surfaces.Add(Cast<AReflectorSurface>(ChildActor));
+		}
+	}
 
 	int i = 0;
-	for (UReflectorSurface* s : Surfaces)
+	for (AReflectorSurface* s : Surfaces)
 	{
 		s->ID = i;
 		i++;

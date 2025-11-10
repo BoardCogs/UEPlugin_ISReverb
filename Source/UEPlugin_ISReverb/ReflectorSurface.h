@@ -1,26 +1,24 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
+#include "GameFramework/Actor.h"
 #include "ReflectorSurface.generated.h"
 
-
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class UEPLUGIN_ISREVERB_API UReflectorSurface : public UActorComponent
+UCLASS()
+class UEPLUGIN_ISREVERB_API AReflectorSurface : public AActor
 {
 	GENERATED_BODY()
-
+	
 public:	
-	// Sets default values for this component's properties
-	UReflectorSurface();
+	// Sets default values for this actor's properties
+	AReflectorSurface();
 
 protected:
-	// Called when the game starts
+	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 public:	
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
-		
 };

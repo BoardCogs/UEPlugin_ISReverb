@@ -1,23 +1,17 @@
 #include "ReflectorSurface.h"
 
-
-// Sets default values for this component's properties
-UReflectorSurface::UReflectorSurface()
+// Sets default values
+AReflectorSurface::AReflectorSurface()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = false;
-
-	// ...
+ 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = false;
 }
 
-
-// Called when the game starts
-void UReflectorSurface::BeginPlay()
+// Called when the game starts or when spawned
+void AReflectorSurface::BeginPlay()
 {
 	Super::BeginPlay();
 
 	//DrawDebugLine();
-	
 }
 

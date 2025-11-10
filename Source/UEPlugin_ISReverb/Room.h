@@ -5,7 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "Room.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable)
 class UEPLUGIN_ISREVERB_API ARoom : public AActor
 {
 	GENERATED_BODY()
@@ -18,10 +18,10 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
-	TArray<UReflectorSurface*> Surfaces;
-
+	TArray<AReflectorSurface*> Surfaces;
+	
 	UPROPERTY(VisibleDefaultsOnly)
 	int SurfaceNumber;
 
