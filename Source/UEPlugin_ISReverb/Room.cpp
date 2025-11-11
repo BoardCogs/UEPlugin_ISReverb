@@ -36,7 +36,7 @@ void ARoom::GetReflectors()
 		if (ChildActor->GetChildActor()->IsA(AReflectorSurface::StaticClass()))
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Found one"));
-			//Surfaces.Add(Cast<AReflectorSurface>(ChildActor->GetChildActor()));
+			Surfaces.Add(Cast<AReflectorSurface>(ChildActor->GetChildActor()));
 		}
 	}
 
