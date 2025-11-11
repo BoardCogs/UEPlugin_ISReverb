@@ -22,7 +22,7 @@ public:
 	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
 	TArray<AReflectorSurface*> Surfaces;
 	
-	UPROPERTY(VisibleDefaultsOnly)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int SurfaceNumber;
 
 	UFUNCTION(BlueprintCallable)
