@@ -25,4 +25,7 @@ public:
 	UPROPERTY(VisibleDefaultsOnly)
 	int SurfaceNumber;
 
+	UFUNCTION(BlueprintCallable)
+	void GetReflectors();
+
 };
