@@ -4,7 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "ReflectorSurface.generated.h"
 
-UCLASS()
+UCLASS(Blueprintable)
 class UEPLUGIN_ISREVERB_API AReflectorSurface : public AActor
 {
 	GENERATED_BODY()
