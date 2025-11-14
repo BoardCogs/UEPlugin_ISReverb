@@ -20,4 +20,5 @@ public:
 	double Length();
 	
 	~ReflectorEdge();
+	
 };

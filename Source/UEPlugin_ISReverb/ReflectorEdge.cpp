@@ -11,9 +11,7 @@ ReflectorEdge::ReflectorEdge(FVector3d a, FVector3d b)
 
 FVector3d ReflectorEdge::Direction()
 {
-	FVector3d direction = PointA - PointB;
-	direction.Normalize();
-	return direction;
+	return (PointA - PointB).GetSafeNormal();
 }
 	
 double ReflectorEdge::Length()
