@@ -10,6 +10,14 @@
 class UEPLUGIN_ISREVERB_API ReflectorEdge
 {
 public:
-	ReflectorEdge();
+	FVector3d PointA;
+	FVector3d PointB;
+	
+	ReflectorEdge(FVector3d a, FVector3d b);
+
+	FVector3d Direction();
+	
+	double Length();
+	
 	~ReflectorEdge();
 };
