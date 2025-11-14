@@ -3,13 +3,13 @@
 
 #include "ReflectorEdge.h"
 
-ReflectorEdge::ReflectorEdge(FVector3d a, FVector3d b)
+ReflectorEdge::ReflectorEdge(FVector3f a, FVector3f b)
 {
 	PointA = a;
 	PointB = b;
 }
 
-FVector3d ReflectorEdge::Direction()
+FVector3f ReflectorEdge::Direction()
 {
 	return (PointA - PointB).GetSafeNormal();
 }

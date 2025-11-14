@@ -21,10 +21,20 @@ protected:
 public:	
 	UPROPERTY(VisibleAnywhere)
 	int ID;
+
+	UFUNCTION(BlueprintCallable)
+	FVector3f Origin();
+
+	UFUNCTION(BlueprintCallable)
+	FVector3f Normal();
+	
+	TArray<FVector3f> Points();
+	
+	TArray<ReflectorEdge> Edges();
 	
 private:
-	TArray<FVector3d> Points;
+	TArray<FVector3f> _points;
 	
-	TArray<ReflectorEdge> Edges;
+	TArray<ReflectorEdge> _edges;
 	
 };
