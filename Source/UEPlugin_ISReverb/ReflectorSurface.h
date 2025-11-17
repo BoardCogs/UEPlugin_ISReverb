@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ReflectorEdge.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ReflectorSurface.generated.h"
@@ -21,4 +22,19 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
+	UFUNCTION(BlueprintCallable)
+	FVector3f Origin();
+
+	UFUNCTION(BlueprintCallable)
+	FVector3f Normal();
+	
+	TArray<FVector3f> Points();
+	
+	TArray<ReflectorEdge> Edges();
+	
+private:
+	TArray<FVector3f> _points;
+	
+	TArray<ReflectorEdge> _edges;
+	
 };
