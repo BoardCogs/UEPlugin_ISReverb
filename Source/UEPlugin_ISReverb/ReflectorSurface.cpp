@@ -15,8 +15,6 @@ AReflectorSurface::AReflectorSurface()
 void AReflectorSurface::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, Origin().ToString() );
 
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(50,50,0)) ) );
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(-50,50,0)) ) );
@@ -28,31 +26,38 @@ void AReflectorSurface::BeginPlay()
 	_edges.Add(ReflectorEdge(_points[2], _points[3]));
 	_edges.Add(ReflectorEdge(_points[3], _points[0]));
 
-	DrawDebugLine(GetWorld(), FVector(Origin()), FVector(Origin() + Normal()), FColor::Blue, true, -1, 0, 1);
+	// Draw lines indicating surface edges and normals to check
+	/*
+	DrawDebugLine(GetWorld(), FVector(Origin()), FVector(Origin() + 50*Normal()), FColor::Blue, true, -1, 0, 1);
 
 	for (ReflectorEdge Edge : _edges)
 	{
 		DrawDebugLine(GetWorld(), FVector(Edge.PointA), FVector(Edge.PointB), FColor::Blue, true, -1, 0, 1);
 	}
+	*/
 }
 
 
 
+// Returns the origin point of this surface in world coordinates
 FVector3f AReflectorSurface::Origin()
 {
 	return FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
 }
 
+// Returns the normal of this surface as a unit vector
 FVector3f AReflectorSurface::Normal()
 {
-	return /*(*/FVector3f( GetTransform().TransformPosition(FVector3d(0,0,10)) ) - Origin()/*).GetSafeNormal()*/;
+	return (FVector3f( GetTransform().TransformPosition(FVector3d(0,0,10)) ) - Origin()).GetSafeNormal();
 }
 
+// Returns all points of the surface polygon
 TArray<FVector3f> AReflectorSurface::Points()
 {
 	return _points;
 }
 
+// Returns all edges of the surface polygon
 TArray<ReflectorEdge> AReflectorSurface::Edges()
 {
 	return _edges;

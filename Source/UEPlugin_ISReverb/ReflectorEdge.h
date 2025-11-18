@@ -17,7 +17,7 @@ public:
 
 	FVector3f Direction();
 	
-	double Length();
+	float Length();
 	
 	~ReflectorEdge();
 	
