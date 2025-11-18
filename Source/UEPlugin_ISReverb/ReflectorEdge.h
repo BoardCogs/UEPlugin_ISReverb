@@ -1,11 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 
 /**
- * 
+ * Edge of a reflector, defined by its two extremes expressed in world coordinates.
  */
 class UEPLUGIN_ISREVERB_API ReflectorEdge
 {
@@ -17,8 +15,14 @@ public:
 
 	FVector3f Direction();
 	
-	double Length();
+	float Length();
+
+	bool IsVoid();
 	
 	~ReflectorEdge();
+
+protected:
+
+	friend bool operator==(const ReflectorEdge& lhs, const ReflectorEdge& rhs);
 	
 };

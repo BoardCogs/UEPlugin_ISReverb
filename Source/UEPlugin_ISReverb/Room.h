@@ -5,6 +5,10 @@
 #include "GameFramework/Actor.h"
 #include "Room.generated.h"
 
+/**
+ * A room, given bounds and surfaces that reflect sound.
+ * Surfaces should approximate the room's shape and most prominent features.
+ */
 UCLASS(Blueprintable)
 class UEPLUGIN_ISREVERB_API ARoom : public AActor
 {
