@@ -9,8 +9,10 @@
 class UEPLUGIN_ISREVERB_API IS
 {
 public:
+	// CONSTRUCTOR
 	IS(int i, int o, int p, int s, ISBeamProjection beam, bool v = true);
 
+	// PROPERTIES
 	// The index of this Image Source in its ISTree
 	int Index;
 
@@ -37,7 +39,9 @@ public:
 
 	// The reflection path followed by sound to reach the listener
 	TArray<FVector3f> Path;
-	
+
+	// METHODS
+	// Sets the path followed by the sound ray as it bounces on reflectors, represented through each reflection point
 	void SetPath(bool b, TArray<FVector3f> p);
 	
 	~IS();

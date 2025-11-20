@@ -12,13 +12,14 @@
 class UEPLUGIN_ISREVERB_API ISTree
 {
 public:
+	// CONSTRUCTOR
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
     ISTree(int n, int r, FVector3f sourcePos, ARoom room, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
 
 private:
-
+	// PROPERTIES
 	// Number of surfaces
     int _sn;
     
@@ -52,6 +53,9 @@ private:
     // Generates ISs that would be shaved by beam tracing and clipping as inactive ISs, allows to check wether the optimization is accurate or not
     bool _debugBeamTracing;
 
+	TArray<AReflectorSurface*> _surfaces;
+
+	// METHODS
     // All reflectors in the scene
     TArray<AReflectorSurface*> Surfaces();
 
@@ -59,16 +63,17 @@ private:
     bool CreateIS(int i, int order, int parent, int surface, TArray<FVector3f> projectionPlanesNormals);
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-    TArray<FVector3f> CreateProjectionPlanes(FVector3f position, ISBeamProjection beam);
+    TArray<FVector3f> CreateProjectionPlanes(FVector3f position, ISBeamProjection BeamProjection);
 
     // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points
     bool CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points);
 
 public:
-
+	// PROPERTIES
 	// The Room from which to take surfaces
 	ARoom* Room;
-    
+
+	// METHODS
     // For public access
     TArray<IS> Nodes();
     

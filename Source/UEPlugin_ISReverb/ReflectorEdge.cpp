@@ -23,6 +23,12 @@ float ReflectorEdge::Length()
 
 
 
+// Returns an empty edge
+ReflectorEdge ReflectorEdge::Void()
+{
+	return ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
+}
+
 // Returns true if the edge has zero vectors for both extremes
 bool ReflectorEdge::IsVoid()
 {

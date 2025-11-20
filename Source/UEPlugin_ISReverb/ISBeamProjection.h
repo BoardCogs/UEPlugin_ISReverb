@@ -10,7 +10,10 @@
 class UEPLUGIN_ISREVERB_API ISBeamProjection
 {
 public:
+	// CONSTRUCTOR
 	ISBeamProjection(TArray<FVector3f> points, TArray<ReflectorEdge> edges);
+
+	// METHODS
 	
 	TArray<FVector3f> Points();
 	
@@ -30,6 +33,7 @@ public:
 	~ISBeamProjection();
 	
 private:
+	// PROPERTIES
 	TArray<FVector3f> _points;
 	
 	TArray<ReflectorEdge> _edges;

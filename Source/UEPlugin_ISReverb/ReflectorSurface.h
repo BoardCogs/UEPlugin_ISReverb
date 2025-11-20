@@ -14,18 +14,22 @@ class UEPLUGIN_ISREVERB_API AReflectorSurface : public AActor
 {
 	GENERATED_BODY()
 	
-public:	
+public:
+	// CONSTRUCTOR
 	// Sets default values for this actor's properties
 	AReflectorSurface();
 
 protected:
+	// METHODS
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
+	// PROPERTIES
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
+	// METHODS
 	UFUNCTION(BlueprintCallable)
 	FVector3f Origin();
 
@@ -37,6 +41,7 @@ public:
 	TArray<ReflectorEdge> Edges();
 	
 private:
+	// PROPERTIES
 	TArray<FVector3f> _points;
 	
 	TArray<ReflectorEdge> _edges;
