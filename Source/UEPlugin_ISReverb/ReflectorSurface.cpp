@@ -26,6 +26,17 @@ void AReflectorSurface::BeginPlay()
 	_edges.Add(ReflectorEdge(_points[2], _points[3]));
 	_edges.Add(ReflectorEdge(_points[3], _points[0]));
 
+	TArray<UStaticMeshComponent*> Planes;
+	GetComponents<UStaticMeshComponent>(Planes);
+
+	for (UStaticMeshComponent* plane : Planes)
+	{
+		if (plane->GetName() == "Plane")
+		{
+			plane->SetVisibility(false);	
+		}
+	}
+
 	// Draw lines indicating surface edges and normals to check
 	/*
 	DrawDebugLine(GetWorld(), FVector(Origin()), FVector(Origin() + 50*Normal()), FColor::Blue, true, -1, 0, 1);
