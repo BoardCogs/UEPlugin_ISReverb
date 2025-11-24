@@ -16,6 +16,8 @@ void AReflectorSurface::BeginPlay()
 {
 	Super::BeginPlay();
 
+	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, GetName() );
+
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(50,50,0)) ) );
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(-50,50,0)) ) );
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(-50,-50,0)) ) );
