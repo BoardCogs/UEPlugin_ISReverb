@@ -16,7 +16,7 @@ public:
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    ISTree(int n, int r, FVector3f sourcePos, ARoom room, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
+    ISTree(int n, int r, FVector3f sourcePos, ARoom* room, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
 
 private:
 	// PROPERTIES

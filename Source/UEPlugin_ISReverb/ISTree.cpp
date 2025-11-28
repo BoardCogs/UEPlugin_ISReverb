@@ -1,13 +1,13 @@
 #include "ISTree.h"
 
-ISTree::ISTree(int n, int r, FVector3f sourcePos, ARoom room, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
+ISTree::ISTree(int n, int r, FVector3f sourcePos, ARoom* room, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
 	if (r == 0)
         return;
     
     _sn = n;
     _ro = r;
-    Room = &room;
+    Room = room;
     _surfaces = Surfaces();
     _wrongSideOfReflector = wrongSideOfReflector;
     _beamTracing = beamTracing;

@@ -31,7 +31,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	TArray<ARoom*> GetRooms();
 	
-private:
+protected:
 	TArray<ARoom*> _rooms;
 
 	TMap<ARoom*, int> _counter;
