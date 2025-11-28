@@ -4,7 +4,7 @@
 AIS_RoomTracker::AIS_RoomTracker()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 }
 
@@ -13,13 +13,6 @@ void AIS_RoomTracker::BeginPlay()
 {
 	Super::BeginPlay();
 	
-}
-
-// Called every frame
-void AIS_RoomTracker::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
 }
 
 
@@ -55,7 +48,7 @@ void AIS_RoomTracker::OnExitRoomCollider(ARoom* room)
 	_rooms.Remove(room);
 	_counter.Remove(room);
 	            
-	//UpdateCurrentRoom();
+	UpdateCurrentRoom();
 }
 
 
@@ -67,3 +60,10 @@ void AIS_RoomTracker::UpdateCurrentRoom()
 	if (_rooms.Num() != 1) return;
 }
 
+
+
+// Returns the rooms in which this object is present
+TArray<ARoom*> AIS_RoomTracker::GetRooms()
+{
+	return _rooms;
+}

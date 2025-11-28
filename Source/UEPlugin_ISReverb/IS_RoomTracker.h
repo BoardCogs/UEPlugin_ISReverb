@@ -5,7 +5,7 @@
 #include "GameFramework/Actor.h"
 #include "IS_RoomTracker.generated.h"
 
-UCLASS()
+UCLASS(Abstract)
 class UEPLUGIN_ISREVERB_API AIS_RoomTracker : public AActor
 {
 	GENERATED_BODY()
@@ -19,9 +19,6 @@ protected:
 	virtual void BeginPlay() override;
 
 public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
-
 	// Called whenever entering a room collider
 	UFUNCTION(BlueprintCallable)
 	void OnEnterRoomCollider(ARoom* room);
@@ -29,6 +26,10 @@ public:
 	// Called whenever exiting a room collider
 	UFUNCTION(BlueprintCallable)
 	void OnExitRoomCollider(ARoom* room);
+
+	// Returns the rooms in which this object is present
+	UFUNCTION(BlueprintCallable)
+	TArray<ARoom*> GetRooms();
 	
 private:
 	TArray<ARoom*> _rooms;
