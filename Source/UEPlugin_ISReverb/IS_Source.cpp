@@ -14,3 +14,29 @@ void AIS_Source::BeginPlay()
 	Super::BeginPlay();
 	
 }
+
+
+
+void AIS_Source::UpdateCurrentRoom()
+{
+	Super::UpdateCurrentRoom();
+
+	Room = TEXT("Currently in");
+
+	if (_rooms.Num() > 0)
+	{
+		Room.Append(TEXT(":"));
+		
+		for (ARoom* room : _rooms)
+		{
+			Room.Append(TEXT(" "));
+			Room.Append(room->GetName());
+		}
+
+		Room.Append(TEXT("."));
+	}
+	else
+	{
+		Room.Append(TEXT(" no room."));
+	}
+}

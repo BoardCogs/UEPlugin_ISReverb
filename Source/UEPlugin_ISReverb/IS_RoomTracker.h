@@ -10,7 +10,7 @@ class UEPLUGIN_ISREVERB_API AIS_RoomTracker : public AActor
 {
 	GENERATED_BODY()
 	
-public:	
+public:
 	// Sets default values for this actor's properties
 	AIS_RoomTracker();
 
@@ -36,7 +36,7 @@ protected:
 
 	TMap<ARoom*, int> _counter;
 
-	// Called every time OnEnter or OnExit are called to establish if the reverb needs to change
-	void UpdateCurrentRoom();
+	// Called every time OnEnter or OnExit add or remove a room
+	virtual void UpdateCurrentRoom();
 
 };

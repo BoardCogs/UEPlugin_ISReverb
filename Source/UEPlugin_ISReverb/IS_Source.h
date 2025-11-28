@@ -23,68 +23,63 @@ private:
     ISTree tree = ISTree(0, 0, FVector3f::Zero(), nullptr, false, false, false, false);;
 
 public:
-    //[Tooltip("The layer mask for sound reflection")] [SerializeField]
+    /* The layer mask for sound reflection. */
     //LayerMask layerMask;
 
-    //[Tooltip("The maximum order of reflection to be computed")] [SerializeField]
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    FString Room;
+
+    /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
     int order;
 
-    //[Tooltip("Set to true to activate IS generation (only in play mode)")] [SerializeField]
-    UPROPERTY(EditAnywhere)
-    bool generateImageSources = false;
-
-    //[Tooltip("Set to true to activate path generation and checking (only in play mode)")] [SerializeField]
-    UPROPERTY(EditAnywhere)
-    bool generateReflectionPaths = false;
-
-    //[Tooltip("Set to true to visualize ISs (performance heavy)")] [SerializeField]
+    /* Set to true to visualize ISs (performance heavy) */
     UPROPERTY(EditAnywhere)
     bool drawImageSources = false;
 
     //[Header("Optimizations")]
 
-    //[Tooltip("Set true to remove all ISs that fall on the front side of their reflecting surface")] [SerializeField]
+    /* Set true to remove all ISs that fall on the front side of their reflecting surface */
     UPROPERTY(EditAnywhere)
     bool WrongSideOfReflector = true;
 
-    //[Tooltip("Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector")] [SerializeField]
+    /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector */
     UPROPERTY(EditAnywhere)
     bool BeamTracing = true;
 
-    //[Tooltip("Set true to clip IS reflectors with their parent's projection upon them, for more accurate beam tracing")] [SerializeField]
+    /* Set true to clip IS reflectors with their parent's projection upon them, for more accurate beam tracing */
     UPROPERTY(EditAnywhere)
     bool BeamClipping = true;
 
     //[Header("Visualize")]
 
-    //[Tooltip("The minimum order of valid reflections to be visualized (included), set to -1 to disable")] [SerializeField]
+    /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
     int MinOrder = -1;
 
-    //[Tooltip("The maximum order of valid reflections to be visualized (included), set to -1 to disable")] [SerializeField]
+    /* The maximum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
     int MaxOrder = -1;
 
     //[Header("Debug")]
 
-    //[Tooltip("Draws projection of beam points and beam edges upon the reflector plane")] [SerializeField]
+    /* Draws projection of beam points and beam edges upon the reflector plane */
     UPROPERTY(EditAnywhere)
     bool drawPlaneProjection = true;
 
-    //[Tooltip("The id of the IS node to be visualized for debug, set to -1 to disable")] [SerializeField]
+    /* The id of the IS node to be visualized for debug, set to -1 to disable */
     UPROPERTY(EditAnywhere)
     int checkNode = -1;
 
-    //[Tooltip("The id of this IS node's parent")] [SerializeField]
+    /* The id of this IS node's parent */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     int parentNode = 0;
 
-    //[Tooltip("Set true to create invalid nodes (removed by optimization) in the list below, to check for accurate removal")] [SerializeField]
+    /* Set true to create invalid nodes (removed by optimization) in the list below, to check for accurate removal */
     UPROPERTY(EditAnywhere)
     bool debugBeamTracing;
 
-    //[Tooltip("Nodes removed by optimization, list is always empty if the option above is set to false")] [SerializeField]
+    /* Nodes removed by optimization, list is always empty if the option above is set to false */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     TArray<int> inactiveNodes = TArray<int>();
 
@@ -102,28 +97,12 @@ protected:
     */
 
 
-
-    /*
-    // Activates node regeneration with the given parameters
-    void OnValidate()
-    {
-        if (generateImageSources == true)
-        {
-            GenerateISPositions();
-            generateImageSources = false;
-        }
-
-        if (generateReflectionPaths == true)
-        {
-            GenerateReflectionPaths();
-            generateReflectionPaths = false;
-        }
-    }
-
-
     
+private:
     // Generates Image Sources position with the given parameters
-    private void GenerateISPositions()
+    //UFUNCTION(CallInEditor)
+    void GenerateISPositions();
+    /*
     {
         bool _backUpDrawISs = drawImageSources;
         drawImageSources = false;
@@ -140,11 +119,14 @@ protected:
 
         drawImageSources = _backUpDrawISs;
     }
+    */
 
 
 
     // Generates paths for sound reflections, checking if the sound reaches the listener
-    private void GenerateReflectionPaths()
+    //UFUNCTION(CallInEditor)
+    void GenerateReflectionPaths();
+    /*
     {
         if (tree == null)
             return;
@@ -233,9 +215,11 @@ protected:
                     validPaths + " ISs with a valid path out of " + tree.Nodes.Count + " total ISs"
                  );
     }
+    */
 
 
 
+    /*
     void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
@@ -380,11 +364,14 @@ protected:
             }
         }
     }
+    */
+    
 
 
-
+public:
     // Returns true if a plane and segment intersect, point of intersection is in output in the variable intersection
-    public static int LinePlaneIntersection(out Vector3 intersection, Vector3 linePoint, Vector3 lineVec, Vector3 planeNormal, Vector3 planePoint, double epsilon = 1e-6)
+    static int LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon = 1e-6);
+    /*
     {
         float length;
         float dotNumerator;
@@ -411,5 +398,12 @@ protected:
         }
     }
     */
+
+    
+
+protected:
+    // Called every time OnEnter or OnExit add or remove a room
+    UFUNCTION(BlueprintCallable)
+    void UpdateCurrentRoom() override;
 
 };

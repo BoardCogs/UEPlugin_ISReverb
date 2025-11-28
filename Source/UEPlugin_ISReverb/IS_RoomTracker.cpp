@@ -23,14 +23,14 @@ void AIS_RoomTracker::OnEnterRoomCollider(ARoom* room)
 	// If this room isn't already in its tracker, insert it
 	if (!_rooms.Contains(room))
 	{
-		_counter[room] = 0;
+		_counter.Add(room, 0);
 		_rooms.Add(room);
 
 		UpdateCurrentRoom();
 	}
 
 	// Increase the counter
-	_counter[room] += 1;
+	_counter.Add(room, _counter[room]++);
 }
 
 
@@ -39,7 +39,7 @@ void AIS_RoomTracker::OnEnterRoomCollider(ARoom* room)
 void AIS_RoomTracker::OnExitRoomCollider(ARoom* room)
 {
 	// Decrease the counter
-	_counter[room] -= 1;
+	_counter.Add(room, _counter[room]--);
 
 	if (_counter[room] > 0) return;
 
@@ -53,7 +53,7 @@ void AIS_RoomTracker::OnExitRoomCollider(ARoom* room)
 
 
 
-// Called every time OnEnter or OnExit are called to establish if the reverb needs to change
+// Called every time OnEnter or OnExit add or remove a room
 void AIS_RoomTracker::UpdateCurrentRoom()
 {
 	// If the player is currently in between rooms, wait
