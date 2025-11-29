@@ -1,20 +1,20 @@
 #include "ISTree.h"
 
-ISTree::ISTree(int n, int r, FVector3f sourcePos, ARoom* room, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
+ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
 	if (r == 0)
         return;
     
-    _sn = n;
     _ro = r;
-    Room = room;
+    Rooms = rooms;
     _surfaces = Surfaces();
+    _sn = _surfaces.Num();
     _wrongSideOfReflector = wrongSideOfReflector;
     _beamTracing = beamTracing;
     _beamClipping = beamClipping;
     _debugBeamTracing = debugBeamTracing;
 
-    float timePassed = UGameplayStatics::GetTimeSeconds(Room->GetWorld());
+    float timePassed = UGameplayStatics::GetTimeSeconds(Rooms[0]->GetWorld());
 
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
@@ -56,7 +56,7 @@ ISTree::ISTree(int n, int r, FVector3f sourcePos, ARoom* room, bool wrongSideOfR
         }
     }
 
-    timePassed = UGameplayStatics::GetTimeSeconds(Room->GetWorld()) - timePassed;
+    timePassed = UGameplayStatics::GetTimeSeconds(Rooms[0]->GetWorld()) - timePassed;
 
     /*
     Sending to console a debug message showing the total number of ISs created and the amount saved by optimization.
@@ -462,14 +462,17 @@ TArray<IS> ISTree::Nodes()
 // All reflectors in the scene
 TArray<AReflectorSurface*> ISTree::Surfaces()
 {
-    if (Room != nullptr)
+    TArray<AReflectorSurface*> surfaces = TArray<AReflectorSurface*>();
+    
+    for (ARoom* room : Rooms)
     {
-        return Room->Surfaces;
+        if (room != nullptr)
+        {
+            surfaces.Append(room->Surfaces);
+        }
     }
-    else
-    {
-        return TArray<AReflectorSurface*>();
-    }
+
+    return surfaces;
 }
 
 

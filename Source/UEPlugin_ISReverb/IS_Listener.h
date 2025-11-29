@@ -11,5 +11,9 @@ UCLASS(Blueprintable)
 class UEPLUGIN_ISREVERB_API AIS_Listener : public AIS_RoomTracker
 {
 	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere)
+	bool ActiveListener;
 	
 };

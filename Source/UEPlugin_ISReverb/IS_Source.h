@@ -4,7 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "ISTree.h"
+#include "IS_Listener.h"
 #include "IS_RoomTracker.h"
+#include "UObject/ObjectMacros.h"
 #include "IS_Source.generated.h"
 
 /**
@@ -19,8 +21,11 @@ public:
     AIS_Source();
 
 private:
-	// The Image Sources tree
-    ISTree tree = ISTree(0, 0, FVector3f::Zero(), nullptr, false, false, false, false);;
+    // The Image Sources trees
+    //ISTree tree = ISTree(0, 0, FVector3f::Zero(), nullptr, false, false, false, false);;
+
+    // Image Sources trees, one for each listener
+    TMap<AIS_Listener*, ISTree> trees;
 
 public:
     /* The layer mask for sound reflection. */
@@ -399,6 +404,10 @@ public:
     }
     */
 
+
+
+    // Returns true if two TArrays of room pointers have at least one room in common
+    static bool RoomsInCommon(TArray<ARoom*> a, TArray<ARoom*> b);
     
 
 protected:
