@@ -26,6 +26,9 @@ protected:
 
 public:
 	// PROPERTIES
+	UPROPERTY(EditAnywhere)
+	bool VisibleInGame;
+	
 	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
 	TArray<AReflectorSurface*> Surfaces;
 	

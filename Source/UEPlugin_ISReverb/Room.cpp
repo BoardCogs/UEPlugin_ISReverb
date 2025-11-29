@@ -39,6 +39,20 @@ void ARoom::GetReflectors()
 		if (ChildActor->GetChildActor()->IsA(AReflectorSurface::StaticClass()))
 		{
 			Surfaces.Add(Cast<AReflectorSurface>(ChildActor->GetChildActor()));
+
+			if (!VisibleInGame)
+			{
+				TArray<UStaticMeshComponent*> Planes;
+				ChildActor->GetChildActor()->GetComponents<UStaticMeshComponent>(Planes);
+
+				for (UStaticMeshComponent* plane : Planes)
+				{
+					if (plane->GetName() == "Plane")
+					{
+						plane->SetVisibility(false);	
+					}
+				}
+			}
 		}
 	}
 

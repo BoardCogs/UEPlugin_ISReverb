@@ -28,6 +28,7 @@ void AReflectorSurface::BeginPlay()
 	_edges.Add(ReflectorEdge(_points[2], _points[3]));
 	_edges.Add(ReflectorEdge(_points[3], _points[0]));
 
+	/* This code was moved in the Room class to be toggled for each room
 	TArray<UStaticMeshComponent*> Planes;
 	GetComponents<UStaticMeshComponent>(Planes);
 
@@ -38,6 +39,7 @@ void AReflectorSurface::BeginPlay()
 			plane->SetVisibility(false);	
 		}
 	}
+	*/
 
 	// Draw lines indicating surface edges and normals to check
 	/*
