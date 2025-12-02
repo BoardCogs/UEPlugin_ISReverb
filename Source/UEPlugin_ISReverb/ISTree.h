@@ -60,7 +60,7 @@ private:
     TArray<AReflectorSurface*> Surfaces();
 
     // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-    bool CreateIS(int i, int order, int parent, int surface, TArray<FVector3f> projectionPlanesNormals);
+    bool CreateIS(int i, int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals);
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
     TArray<FVector3f> CreateProjectionPlanes(FVector3f position, ISBeamProjection BeamProjection);

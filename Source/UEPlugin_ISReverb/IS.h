@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ISBeamProjection.h"
+#include "ReflectorSurface.h"
 
 /**
  * An Image Source, representing a possible reflection path from sound source to listener along a specific set of surfaces.
@@ -10,7 +11,7 @@ class UEPLUGIN_ISREVERB_API IS
 {
 public:
 	// CONSTRUCTOR
-	IS(int i, int o, int p, int s, ISBeamProjection beam, bool v = true);
+	IS(int i, int o, int p, AReflectorSurface* s, ISBeamProjection beam, bool v = true);
 
 	// PROPERTIES
 	// The index of this Image Source in its ISTree
@@ -23,7 +24,7 @@ public:
 	int Parent;
 
 	// The index of this Image Source's reflector
-	int Surface;
+	AReflectorSurface* Surface;
 
 	// The position of the Image Source
 	FVector3f Position = FVector3f::Zero();

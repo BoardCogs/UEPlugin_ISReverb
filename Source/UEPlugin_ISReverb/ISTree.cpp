@@ -23,7 +23,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
     // Creating the first order ISs
     for (int i = 0; i < _sn ; i++, _realISs++)
     {
-        _nodes.Add( IS( i, 1, -1, i, ISBeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
+        _nodes.Add( IS( i, 1, -1, _surfaces[i], ISBeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
 
         FVector3f pos = sourcePos;
             
@@ -50,7 +50,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
             // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
             for (int s = 0 ; s < _sn ; s++)
             {
-                if ( CreateIS(i, order, p, s, projectionPlanesNormals) )
+                if ( CreateIS(i, order, p, _surfaces[s], projectionPlanesNormals) )
                     i++;
             }
         }
@@ -74,7 +74,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool ISTree::CreateIS(int i, int order, int parent, int surface, TArray<FVector3f> projectionPlanesNormals)
+bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals)
 {
 	// 1
     // Checking that no IS is created identifying a reflection on the same surface twice in a row
@@ -87,13 +87,13 @@ bool ISTree::CreateIS(int i, int order, int parent, int surface, TArray<FVector3
 
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
     FVector3f pos = _nodes[parent].Position;
-    pos -= 2 * FVector3f::DotProduct( _surfaces[surface]->Normal() , pos - _surfaces[surface]->Origin() ) * _surfaces[surface]->Normal();
+    pos -= 2 * FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) * surface->Normal();
 
 
 
     // 2
     // Checking that the IS is not on the wrong side of the reflector, standing on the opposite side of the surface's normal
-    if ( _wrongSideOfReflector && FVector3f::DotProduct( _surfaces[surface]->Normal() , pos - _surfaces[surface]->Origin() ) >= 0 )
+    if ( _wrongSideOfReflector && FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) >= 0 )
     {
         _wrongSide++;
         return false;
@@ -104,7 +104,7 @@ bool ISTree::CreateIS(int i, int order, int parent, int surface, TArray<FVector3
     // 3
     // Checking that reflections from parent to this surface are possible with beam tracing (+ clipping)
 
-    ISBeamProjection beam = ISBeamProjection( _surfaces[surface]->Points() , _surfaces[surface]->Edges() );
+    ISBeamProjection beam = ISBeamProjection( surface->Points() , surface->Edges() );
 
     if (_beamTracing)
     {
@@ -377,7 +377,7 @@ bool ISTree::CreateIS(int i, int order, int parent, int surface, TArray<FVector3
     if (_beamClipping)
         _nodes.Add( IS(i, order, parent, surface, beam ) );
     else
-        _nodes.Add( IS(i, order, parent, surface, ISBeamProjection( _surfaces[surface]->Points() , _surfaces[surface]->Edges() ) ) );
+        _nodes.Add( IS(i, order, parent, surface, ISBeamProjection( surface->Points() , surface->Edges() ) ) );
 
     _nodes[i].Position = pos;
 
