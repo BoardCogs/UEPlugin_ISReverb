@@ -40,6 +40,7 @@ void ARoom::GetReflectors()
 		{
 			Surfaces.Add(Cast<AReflectorSurface>(ChildActor->GetChildActor()));
 
+			// Turning surfaces invisible unless the VisibleInGame toggle is on 
 			if (!VisibleInGame)
 			{
 				TArray<UStaticMeshComponent*> Planes;
@@ -69,3 +70,38 @@ void ARoom::GetReflectors()
 	SurfaceNumber = i;
 }
 
+
+
+void ARoom::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
+
+	// If the changed property is VisibleInGame
+	if (MemberPropertyName == "VisibleInGame")
+	{
+		// If the world is not currently in editor mode
+		if (GetWorld()->WorldType != EWorldType::Editor)
+		{
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("On it"));
+			
+			// Change visibility of all surfaces according to the property's value
+			for (AReflectorSurface* s : Surfaces)
+			{
+				TArray<UStaticMeshComponent*> Planes;
+				s->GetComponents<UStaticMeshComponent>(Planes);
+
+				for (UStaticMeshComponent* plane : Planes)
+				{
+					if (plane->GetName() == "Plane")
+					{
+						plane->SetVisibility(VisibleInGame);
+					}
+				}
+			}
+
+			UpdateComponentVisibility();
+		}	
+	}
+}

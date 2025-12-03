@@ -35,6 +35,14 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     FString Room;
 
+    /* Set to true to activate IS generation (only in play mode) */
+    UPROPERTY(EditAnywhere)
+    bool generateImageSources = false;
+
+    /* Set to true to activate path generation and checking (only in play mode) */
+    UPROPERTY(EditAnywhere)
+    bool generateReflectionPaths = false;
+
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
     int order;
@@ -102,51 +110,27 @@ protected:
     }
     */
 
+    // Called upon changes made in the editor.
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
 
     
 private:
     // Generates Image Sources position with the given parameters
     UFUNCTION(BlueprintCallable)
     void GenerateISPositions();
-
-
-
+    
     // Generates paths for sound reflections, checking if the sound reaches the listener
     UFUNCTION(BlueprintCallable)
     void GenerateReflectionPaths();
+
+    void DrawHelpers();
     
 
 
 public:
     // Returns true if a plane and segment intersect, point of intersection is in output in the variable intersection
     static int LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon = 1e-6);
-    /*
-    {
-        float length;
-        float dotNumerator;
-        float dotDenominator;
-        intersection = Vector3.zero;
-
-        //calculate the distance between the linePoint and the line-plane intersection point
-        dotNumerator = Vector3.Dot(planePoint - linePoint, planeNormal);
-        dotDenominator = Vector3.Dot(lineVec.normalized, planeNormal);
-
-        // Checks that plane and line are not parallel
-        if ( Math.Abs(dotDenominator) > epsilon)
-        {
-            length = dotNumerator / dotDenominator;
-
-            intersection = linePoint + lineVec.normalized * length;
-
-            return length > 0 ? 1 : -1;
-        }
-        else
-        {
-            // The line and plane are parallel (nothing to do)
-            return 0;
-        }
-    }
-    */
 
 
 

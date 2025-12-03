@@ -156,13 +156,15 @@ void AIS_Source::GenerateReflectionPaths()
 
 
 
-/*
-void OnDrawGizmos()
+void AIS_Source::DrawHelpers()
 {
-    Gizmos.color = Color.red;
-
+	FlushPersistentDebugLines(GetWorld());
+	
     // Draws Source
-    Gizmos.DrawSphere(transform.position, 0.5f);
+	DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 1);
+
+	/*
+	Gizmos.DrawSphere(transform.position, 0.5f);
 
     Gizmos.color = Color.green;
 
@@ -300,8 +302,36 @@ void OnDrawGizmos()
             }
         }
     }
+	*/
 }
-*/
+
+
+
+int AIS_Source::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon)
+{
+	*intersection = FVector3f::Zero();
+
+	*intersection = FVector3f::Zero();
+
+	// Calculate the distance between the linePoint and the line-plane intersection point
+	float dotNumerator = FVector3f::DotProduct(planePoint - linePoint, planeNormal);
+	float dotDenominator = FVector3f::DotProduct(lineVec.GetSafeNormal(), planeNormal);
+
+	// Checks that plane and line are not parallel
+	if ( FMath::Abs(dotDenominator) > epsilon)
+	{
+		float length = dotNumerator / dotDenominator;
+
+		*intersection = linePoint + lineVec.GetSafeNormal() * length;
+
+		return length > 0 ? 1 : -1;
+	}
+	else
+	{
+		// The line and plane are parallel (no intersection)
+		return 0;
+	}
+}
 
 
 
@@ -339,5 +369,54 @@ void AIS_Source::UpdateCurrentRoom()
 	else
 	{
 		Room.Append(TEXT(" no room."));
+	}
+}
+
+
+
+void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
+
+	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths")
+	{
+		if (GetWorld()->WorldType != EWorldType::Editor)
+		{
+			/*
+			if (generateImageSources == true)
+			{
+				generateImageSources = false;
+				GenerateISPositions();
+			}
+	
+			if (generateReflectionPaths == true)
+			{
+				generateReflectionPaths = false;
+				GenerateReflectionPaths();
+			}
+			*/
+		}
+		else
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Not in editor mode please!"));
+			generateImageSources = false;
+			generateReflectionPaths = false;
+		}	
+	}
+
+	// If the property to draw image sources is toggled
+	if (MemberPropertyName == "drawImageSources")
+	{
+		// Remove old debug helpers
+		FlushPersistentDebugLines(GetWorld());
+		
+		// Draw new ISs if set to true
+		if (drawImageSources == true)
+		{
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("On it"));
+			DrawHelpers();
+		}
 	}
 }

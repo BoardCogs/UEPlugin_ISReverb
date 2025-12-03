@@ -24,6 +24,9 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	// Called upon changes made in the editor.
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
 public:
 	// PROPERTIES
 	UPROPERTY(EditAnywhere)
