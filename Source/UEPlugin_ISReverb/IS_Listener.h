@@ -13,7 +13,14 @@ class UEPLUGIN_ISREVERB_API AIS_Listener : public AIS_RoomTracker
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	FString Room;
+	
 	bool ActiveListener;
+
+protected:
+	// Called every time OnEnter or OnExit add or remove a room
+	UFUNCTION(BlueprintCallable)
+	void UpdateCurrentRoom() override;
 	
 };

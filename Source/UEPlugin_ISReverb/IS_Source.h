@@ -124,7 +124,9 @@ private:
     UFUNCTION(BlueprintCallable)
     void GenerateReflectionPaths();
 
-    void DrawHelpers();
+    // Draws and deletes helpers for all debug purposes, according to the properties
+    UFUNCTION(BlueprintCallable)
+    void DrawDebug();
     
 
 

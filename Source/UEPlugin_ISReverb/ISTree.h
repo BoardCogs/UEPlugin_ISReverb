@@ -75,7 +75,7 @@ public:
 
 	// METHODS
     // For public access
-    TArray<IS> Nodes();
+    TArray<IS*> Nodes();
     
     // Returns true if a plane and segment intersect, point of intersection is in output in the variable intersection
     static bool LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon = 1e-6);

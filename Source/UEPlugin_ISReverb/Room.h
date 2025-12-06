@@ -28,6 +28,9 @@ protected:
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 public:
+	UPROPERTY(EditAnywhere)
+	FString Name;
+	
 	// PROPERTIES
 	UPROPERTY(EditAnywhere)
 	bool VisibleInGame;

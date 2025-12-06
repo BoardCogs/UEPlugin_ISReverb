@@ -454,10 +454,19 @@ bool ISTree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint,
 
 
 // For public access
-TArray<IS> ISTree::Nodes()
+TArray<IS*> ISTree::Nodes()
 {
-	return _nodes;
+    TArray<IS*> nodes;
+
+    for (int i = 0; i < _nodes.Num(); i++)
+    {
+        nodes.Add(&_nodes[i]);    
+    }
+    
+	return nodes;
 }
+
+
 
 // All reflectors in the scene
 TArray<AReflectorSurface*> ISTree::Surfaces()
