@@ -34,13 +34,13 @@ void AIS_Source::GenerateISPositions()
 	// Generating an ISTree for each listener in the level
 	for (AActor* actor : listeners)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Inside listeners loop"));
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Inside listeners loop"));
 		AIS_Listener* listener = Cast<AIS_Listener>(actor);
 
 		// If listener and source are in the same room, generate ISs using that room's surfaces
 		if ( RoomsInCommon(listener->GetRooms(), _rooms) )
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source in the same room(s)"));
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source in the same room(s)"));
 			
 			// Generates ISTree and adds it to the array
 			ISTree tree = ISTree(order, FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ), listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
@@ -77,8 +77,6 @@ void AIS_Source::GenerateReflectionPaths()
     
 	for (TPair<AIS_Listener*, ISTree>& pair : trees)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Inside tree loop"));
-		
 		FVector3f listener = FVector3f( pair.Key->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 		ISTree& tree = pair.Value;
 
@@ -89,7 +87,7 @@ void AIS_Source::GenerateReflectionPaths()
 		TArray<FVector3f> intersections;
 		
 		int currentIndex;
-		IS* currentNode;
+		IS* currentNode = nullptr;
 		FVector3f from;
 		FVector3f to;
 
@@ -112,13 +110,13 @@ void AIS_Source::GenerateReflectionPaths()
 					currentNode = nodes[currentIndex];
 					to = currentNode->Position;
 
-					GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
+					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
 
-					if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from), FVector(to), TraceChannel, traceParams) )
+					if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
 					{
 						AReflectorSurface* hitSurface = Cast<AReflectorSurface>( hit.GetActor() );
 
-						GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
+						//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
 
 						if ( hitSurface != nullptr && hitSurface == currentNode->Surface )
 						{
@@ -127,6 +125,7 @@ void AIS_Source::GenerateReflectionPaths()
 						}
 						else
 						{
+							//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("But the wrong thing"));
 							intersections.Add( FVector3f( hit.ImpactPoint ) );
 							node->HasPath = false;
 							break;
@@ -144,7 +143,9 @@ void AIS_Source::GenerateReflectionPaths()
 
 				if (node->HasPath)
 				{
-					if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from), GetTransform().TransformPosition(FVector3d(0,0,0)), TraceChannel, traceParams) )
+					to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
+					
+					if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
 					{
 						intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
 						node->HasPath = true;
@@ -152,14 +153,18 @@ void AIS_Source::GenerateReflectionPaths()
 					}
 					else
 					{
+						AReflectorSurface* hitSurface = Cast<AReflectorSurface>( hit.GetActor() );
+						if ( hitSurface == currentNode->Surface )
+						{
+							GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("The surface itself blocks due to imprecision"));
+						}
+						
 						intersections.Add( FVector3f( hit.ImpactPoint ) );
 						node->HasPath = false;
 					}
 				}
 				
 				node->Path = TArray<FVector3f>(intersections);
-
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::FromInt(node->Path.Num()) );
 			}
 		}
 
@@ -277,7 +282,7 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 	}
 
 	// If the property to draw image sources is toggled
-	if (MemberPropertyName == "drawImageSources")
+	if (MemberPropertyName == "drawImageSources" || MemberPropertyName == "MinOrder" || MemberPropertyName == "MaxOrder" || MemberPropertyName == "drawPlaneProjection" || MemberPropertyName == "checkNode")
 	{
 		DrawDebug();
 	}
@@ -322,20 +327,13 @@ void AIS_Source::DrawDebug()
 			// Getting the first listener (tests should only be performed with one)
 			TArray<AIS_Listener*> listeners; 
 			trees.GetKeys(listeners);
-
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Hello I'm here"));
     		
 			for (IS* node : trees[listeners[0]].Nodes())
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Also here"));
-				
 				if (node->Order >= MinOrder && node->Order <= MaxOrder && node->HasPath)
 				{
-					GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::FromInt(node->Path.Num()) );
-					
 					for (int i = 0; i < node->Path.Num() - 1; i++)
 					{
-						GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("And here as well"));
 						DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), FColor::Black, true, -1, 0, 1);
 					}
 				}
