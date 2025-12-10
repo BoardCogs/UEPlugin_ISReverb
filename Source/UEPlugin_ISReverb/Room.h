@@ -14,20 +14,34 @@ class UEPLUGIN_ISREVERB_API ARoom : public AActor
 {
 	GENERATED_BODY()
 	
-public:	
+public:
+	// CONSTRUCTOR
 	// Sets default values for this actor's properties
 	ARoom();
 
 protected:
+	// METHODS
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	// Called upon changes made in the editor.
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+
 public:
+	UPROPERTY(EditAnywhere)
+	FString Name;
+	
+	// PROPERTIES
+	UPROPERTY(EditAnywhere)
+	bool VisibleInGame;
+	
 	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
 	TArray<AReflectorSurface*> Surfaces;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int SurfaceNumber;
+
+	// METHODS
 
 	UFUNCTION(BlueprintCallable)
 	void GetReflectors();

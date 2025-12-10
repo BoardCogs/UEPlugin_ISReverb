@@ -1,6 +1,6 @@
 #include "IS.h"
 
-IS::IS(int i, int o, int p, int s, ISBeamProjection beam, bool v)
+IS::IS(int i, int o, int p, AReflectorSurface* s, ISBeamProjection beam, bool v)
 {
 	Index = i;
 	Order = o;

@@ -16,6 +16,8 @@ void AReflectorSurface::BeginPlay()
 {
 	Super::BeginPlay();
 
+	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, GetName() );
+
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(50,50,0)) ) );
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(-50,50,0)) ) );
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(-50,-50,0)) ) );
@@ -25,6 +27,19 @@ void AReflectorSurface::BeginPlay()
 	_edges.Add(ReflectorEdge(_points[1], _points[2]));
 	_edges.Add(ReflectorEdge(_points[2], _points[3]));
 	_edges.Add(ReflectorEdge(_points[3], _points[0]));
+
+	/* This code was moved in the Room class to be toggled for each room
+	TArray<UStaticMeshComponent*> Planes;
+	GetComponents<UStaticMeshComponent>(Planes);
+
+	for (UStaticMeshComponent* plane : Planes)
+	{
+		if (plane->GetName() == "Plane")
+		{
+			plane->SetVisibility(false);	
+		}
+	}
+	*/
 
 	// Draw lines indicating surface edges and normals to check
 	/*
