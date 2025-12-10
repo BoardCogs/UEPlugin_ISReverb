@@ -182,8 +182,6 @@ int AIS_Source::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoi
 {
 	*intersection = FVector3f::Zero();
 
-	*intersection = FVector3f::Zero();
-
 	// Calculate the distance between the linePoint and the line-plane intersection point
 	float dotNumerator = FVector3f::DotProduct(planePoint - linePoint, planeNormal);
 	float dotDenominator = FVector3f::DotProduct(lineVec.GetSafeNormal(), planeNormal);
@@ -251,22 +249,23 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 
 	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
 
+	/*
 	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths")
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Hello"));
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Hello"));
 		
 		if (GetWorld()->WorldType != EWorldType::Editor)
 		{
 			if (generateImageSources == true)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating ISs"));
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating ISs"));
 				generateImageSources = false;
 				GenerateISPositions();
 			}
 	
 			if (generateReflectionPaths == true)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating reflections"));
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating reflections"));
 				generateReflectionPaths = false;
 				GenerateReflectionPaths();
 			}
@@ -278,8 +277,9 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Not in editor mode please!"));
 			generateImageSources = false;
 			generateReflectionPaths = false;
-		}	
+		}
 	}
+	*/
 
 	// If the property to draw image sources is toggled
 	if (MemberPropertyName == "drawImageSources" || MemberPropertyName == "MinOrder" || MemberPropertyName == "MaxOrder" || MemberPropertyName == "drawPlaneProjection" || MemberPropertyName == "checkNode")
@@ -300,7 +300,7 @@ void AIS_Source::DrawDebug()
 	if (drawImageSources)
 	{
 		// Original source
-		DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 1);
+		DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
 
 		// Image Sources
 		if (trees.Num() > 0)
@@ -312,7 +312,7 @@ void AIS_Source::DrawDebug()
 			for (IS* node : trees[listeners[0]].Nodes())
 			{
 				if (node->Valid == true)
-					DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 1);
+					DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
 			}
 		}	
 	}
@@ -334,7 +334,7 @@ void AIS_Source::DrawDebug()
 				{
 					for (int i = 0; i < node->Path.Num() - 1; i++)
 					{
-						DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), FColor::Black, true, -1, 0, 1);
+						DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), FColor::Black, true, -1, 0, 2);
 					}
 				}
 
@@ -368,92 +368,98 @@ void AIS_Source::DrawDebug()
 
 				for (int i = 0; i < node->Path.Num() - 1; i++)
 				{
-					DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), color, true, -1, 0, 1);
+					DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), color, true, -1, 0, 2);
 				}
 			}
 		}
 	}
 
 
-	/*
+	
 	// Draws beam tracing and clipping process for the node to check
-	if (checkNode != -1 && checkNode >= SurfaceManager.Instance.N && checkNode < tree.Nodes.Count)
+	if (checkNode != -1)
 	{
-		// Draws the resulting beam projection on the reflector
-
-		Gizmos.color = Color.red;
-
-		IS node = tree.Nodes[checkNode];
-
-		// Displays the parent node index as a readonly field
-		parentNode = node.parent;
-
-		Gizmos.DrawSphere(node.position, 0.7f);
-
-		foreach (var edge in node.beamPoints.Edges)
+		if (trees.Num() > 0)
 		{
-			Gizmos.DrawLine(edge.pointA, edge.pointB);
-		}
-
-		// Creates plane on which the reflector lies
-
-		Plane plane = new(node.beamPoints.Points[0], node.beamPoints.Points[1], node.beamPoints.Points[2]);
-
-		// Draws the parent related gizmos
-
-		Gizmos.color = Color.blue;
-
-		IS nodeParent = tree.Nodes[node.parent];
-
-		Gizmos.DrawSphere(nodeParent.position, 0.7f);
-
-		// Draws parent beam points
-		foreach (var edge in nodeParent.beamPoints.Edges)
-		{
-			Gizmos.DrawLine(edge.pointA, edge.pointB);
-		}
-
-		List<Vector3> intersections = new();
-		List<int> checks = new();
-		Vector3 intersection;
-
-		// Saves projection intersections on reflector plane
-		foreach (var point in nodeParent.beamPoints.Points)
-		{
-			int result = LinePlaneIntersection(out intersection, nodeParent.position, point-nodeParent.position, plane.normal, node.beamPoints.Points[0]);
-
-			if (result == -1)
-			{
-				intersections.Add(point + (point - nodeParent.position).normalized * 50);
-			}
-			else
-			{
-				intersections.Add(intersection);
-			}
+			// Getting the first listener (tests should only be performed with one)
+			TArray<AIS_Listener*> listeners; 
+			trees.GetKeys(listeners);
+			TArray<IS*> nodes = trees[listeners[0]].Nodes();
 			
-			checks.Add(result);
-		}
-
-		// Draws projection beams
-		foreach (var point in intersections)
-		{
-			Gizmos.DrawLine(nodeParent.position, point + (point - nodeParent.position).normalized * 50);
-		}
-
-		// Draws projection of beam points and beam edges upon the reflector plane
-		if (drawPlaneProjection)
-		{
-		foreach (var edge in nodeParent.beamPoints.Edges)
+			if (checkNode >= 0 && checkNode < nodes.Num() && nodes[checkNode]->Parent != -1)
 			{
-				int indexA = nodeParent.beamPoints.Points.IndexOf(edge.pointA);
-				int indexB = nodeParent.beamPoints.Points.IndexOf(edge.pointB);
+				IS* node = nodes[checkNode];
 
-				if (checks[indexA] == 1 && checks[indexB] == 1)
+				// Displays the parent node index as a readonly field
+				parentNode = node->Parent;
+
+				// Highlights the IS in red
+				DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
+
+				// Draws the resulting beam projection on the reflector
+				for (ReflectorEdge edge : node->BeamPoints.Edges())
 				{
-					Gizmos.DrawLine(intersections[indexA], intersections[indexB]);
+					DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Red, true, -1, 0, 2);
+				}
+
+				// Creates normal of plane on which the reflector lies
+				FVector3f planeNormal = FVector3f::CrossProduct(node->BeamPoints.Points()[1] - node->BeamPoints.Points()[0], node->BeamPoints.Points()[2] - node->BeamPoints.Points()[0]);
+
+				// Draws the parent related gizmos
+				//Gizmos.color = Color.blue;
+
+				// Highlights the parent IS in blue
+				IS* nodeParent = nodes[node->Parent];
+				DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
+
+				// Draws parent beam points
+				for (ReflectorEdge edge : nodeParent->BeamPoints.Edges())
+				{
+					DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Blue, true, -1, 0, 2);
+				}
+
+				TArray<FVector3f> intersections;
+				TArray<int> checks;
+				FVector3f intersection;
+
+				// Saves projection intersections on reflector plane
+				for (FVector3f point : nodeParent->BeamPoints.Points())
+				{
+					int result = LinePlaneIntersection(&intersection, nodeParent->Position, point - nodeParent->Position, planeNormal, node->BeamPoints.Points()[0]);
+
+					if (result == -1)
+					{
+						intersections.Add(point + (point - nodeParent->Position).GetSafeNormal() * 1000);
+					}
+					else
+					{
+						intersections.Add(intersection);
+					}
+					
+					checks.Add(result);
+				}
+
+				// Draws projection beams
+				for (FVector3f point : intersections)
+				{
+					DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(point + (point - nodeParent->Position).GetSafeNormal() * 1000), FColor::Blue, true, -1, 0, 2);
+				}
+
+				// Draws projection of beam points and beam edges upon the reflector plane
+				if (drawPlaneProjection)
+				{
+					for (ReflectorEdge edge : nodeParent->BeamPoints.Edges())
+					{
+						int indexA = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointA);
+						int indexB = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointB);
+
+						if (checks[indexA] == 1 && checks[indexB] == 1)
+						{
+							DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, 2);
+						}
+					}
 				}
 			}
 		}
 	}
-	*/
 }

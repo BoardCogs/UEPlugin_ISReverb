@@ -1,5 +1,7 @@
 #include "ISTree.h"
 
+#include <string>
+
 ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
 	if (r == 0)
@@ -305,6 +307,8 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
 
                             if (_debugBeamTracing)
                             {
+                                UE_LOG(LogTemp, Display, TEXT("Other edge not found for node %i"), i);
+                                
                                 _nodes.Add( IS(i, order, parent, surface, beam, false ) );
                                 _nodes[i].Position = pos;
                                 return true;
@@ -336,6 +340,8 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
 
             if (_debugBeamTracing)
             {
+                UE_LOG(LogTemp, Display, TEXT("Only a line or point remains for node %i"), i);
+                
                 _nodes.Add( IS(i, order, parent, surface, beam, false ) );
                 _nodes[i].Position = pos;
                 return true;
@@ -352,12 +358,21 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
             for (FVector3f normal : projectionPlanesNormals)
             {
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( (point - _nodes[parent].Position).GetSafeNormal() , normal) < -0.05f )
+                if ( FVector3f::DotProduct( (point - _nodes[parent].Position).GetSafeNormal() , normal) < -0.5f )
                 {
                     _beam++;
 
                     if (_debugBeamTracing)
                     {
+                        /*
+                        if (i == 42 || i == 44)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("A point falls outside the projection planes for node %i. Precisely, the yellow point falls outside the red plane"), i);
+                            DrawDebugPoint(Rooms[0]->GetWorld(), FVector(point), 50, FColor::Yellow, false, 50000, 0);
+                            DrawDebugSolidPlane(Rooms[0]->GetWorld(), FPlane(FVector(_nodes[parent].Position), FVector(normal)), FVector(_nodes[parent].Position), 50.0f, FColor::Red, false, 50000, 0);
+                        }
+                        */
+                        
                         _nodes.Add( IS(i, order, parent, surface, beam, false ) );
                         _nodes[i].Position = pos;
                         return true;

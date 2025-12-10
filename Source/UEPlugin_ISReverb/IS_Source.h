@@ -36,12 +36,12 @@ public:
     FString Room;
 
     /* Set to true to activate IS generation (only in play mode) */
-    UPROPERTY(EditAnywhere)
-    bool generateImageSources = false;
+    //UPROPERTY(EditAnywhere)
+    //bool generateImageSources = false;
 
     /* Set to true to activate path generation and checking (only in play mode) */
-    UPROPERTY(EditAnywhere)
-    bool generateReflectionPaths = false;
+    //UPROPERTY(EditAnywhere)
+    //bool generateReflectionPaths = false;
 
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
@@ -131,7 +131,8 @@ private:
 
 
 public:
-    // Returns true if a plane and segment intersect, point of intersection is in output in the variable intersection
+    // Returns 1 / -1 if a plane and line intersect, 0 if the plane and segment are parallel, point of intersection is in output in the variable intersection
+    // Return 1 if intersection is obtained by adding to linePoint a positive multiple of lineVec,-1 otherwise
     static int LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon = 1e-6);
 
 
