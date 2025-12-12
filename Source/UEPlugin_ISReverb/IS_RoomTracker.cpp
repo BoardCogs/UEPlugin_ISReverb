@@ -56,8 +56,6 @@ void AIS_RoomTracker::OnExitRoomCollider(ARoom* room)
 // Called every time OnEnter or OnExit add or remove a room
 void AIS_RoomTracker::UpdateCurrentRoom()
 {
-	// If the player is currently in between rooms, wait
-	if (_rooms.Num() != 1) return;
 }
 
 

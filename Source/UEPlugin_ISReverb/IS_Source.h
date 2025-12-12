@@ -28,20 +28,21 @@ private:
     TMap<AIS_Listener*, ISTree> trees;
 
 public:
+    /* The room(s) the source is currently in. */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+    FString Room;
+    
     /* The trace channel for sound reflection. */
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    FString Room;
-
     /* Set to true to activate IS generation (only in play mode) */
-    //UPROPERTY(EditAnywhere)
-    //bool generateImageSources = false;
+    UPROPERTY(EditAnywhere)
+    bool generateImageSources = false;
 
     /* Set to true to activate path generation and checking (only in play mode) */
-    //UPROPERTY(EditAnywhere)
-    //bool generateReflectionPaths = false;
+    UPROPERTY(EditAnywhere)
+    bool generateReflectionPaths = false;
 
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
