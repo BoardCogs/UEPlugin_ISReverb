@@ -75,7 +75,7 @@ void AIS_Source::GenerateReflectionPaths()
     if (trees.IsEmpty())
         return;
 
-    float timePassed = UGameplayStatics::GetTimeSeconds(GetWorld());
+	FDateTime StartTime = FDateTime::UtcNow();
 
     int validPaths = 0;
     
@@ -166,11 +166,11 @@ void AIS_Source::GenerateReflectionPaths()
 			}
 		}
 
-		timePassed = UGameplayStatics::GetTimeSeconds(GetWorld()) - timePassed;
+		int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
 
-		UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %f milliseconds\n"
+		UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
 									  "%i ISs with a valid path out of %i total ISs"),
-									  timePassed * 1000, validPaths, nodes.Num());
+									  TimeElapsedInMs, validPaths, nodes.Num());
 	}
 }
 

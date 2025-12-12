@@ -16,7 +16,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
     _beamClipping = beamClipping;
     _debugBeamTracing = debugBeamTracing;
 
-    float timePassed = UGameplayStatics::GetTimeSeconds(Rooms[0]->GetWorld());
+    FDateTime StartTime = FDateTime::UtcNow();
 
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
@@ -58,19 +58,19 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
         }
     }
 
-    timePassed = UGameplayStatics::GetTimeSeconds(Rooms[0]->GetWorld()) - timePassed;
+    int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
 
     /*
     Sending to console a debug message showing the total number of ISs created and the amount saved by optimization.
     The number of not generated ISs is only the tip of the iceberg: their children would have also been generated.
     */
-    UE_LOG(LogTemp, Display, TEXT("IS generation over in %f milliseconds\n"
+    UE_LOG(LogTemp, Display, TEXT("IS generation over in %i milliseconds\n"
                                   "Total number of ISs generated: %i\n"
                                   "Optimizations:\n"
                                   " - No reflection on same surface twice in a row: %i ISs removed\n"
                                   " - Wrong side of reflector: %i ISs removed\n"
                                   " - Beam tracing%hs: %i ISs removed"),
-                                  timePassed * 1000, _realISs, _noDouble, _wrongSide, (_beamClipping ? " + clipping" : ""), _beam);
+                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, (_beamClipping ? " + clipping" : ""), _beam);
 }
 
 
