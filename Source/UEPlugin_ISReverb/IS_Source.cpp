@@ -59,6 +59,10 @@ void AIS_Source::GenerateISPositions()
 				}
 			}
 		}
+		else
+		{
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source are in separate rooms"));
+		}
 	}
 
 	//drawImageSources = _backUpDrawISs;
@@ -153,12 +157,6 @@ void AIS_Source::GenerateReflectionPaths()
 					}
 					else
 					{
-						AReflectorSurface* hitSurface = Cast<AReflectorSurface>( hit.GetActor() );
-						if ( hitSurface == currentNode->Surface )
-						{
-							GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("The surface itself blocks due to imprecision"));
-						}
-						
 						intersections.Add( FVector3f( hit.ImpactPoint ) );
 						node->HasPath = false;
 					}
@@ -245,15 +243,20 @@ void AIS_Source::UpdateCurrentRoom()
 
 void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
+	// Saving a backup of current rooms
+	TArray<ARoom*> RoomsBackup = _rooms;
+	// Disabling all collisions (the engine will reset them upon calling Super anyway)
+	SetActorEnableCollision(false);
+	// Restoring current rooms
+	_rooms = RoomsBackup;
+	
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
+	// Getting the name of the changed variable
 	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
-
-	/*
+	
 	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths")
 	{
-		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Hello"));
-		
 		if (GetWorld()->WorldType != EWorldType::Editor)
 		{
 			if (generateImageSources == true)
@@ -274,18 +277,29 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 		}
 		else
 		{
+			// No IS generation and simulation unless the game is playing
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Not in editor mode please!"));
 			generateImageSources = false;
 			generateReflectionPaths = false;
 		}
 	}
-	*/
 
 	// If the property to draw image sources is toggled
 	if (MemberPropertyName == "drawImageSources" || MemberPropertyName == "MinOrder" || MemberPropertyName == "MaxOrder" || MemberPropertyName == "drawPlaneProjection" || MemberPropertyName == "checkNode")
 	{
 		DrawDebug();
 	}
+
+	// Empty rooms
+	_rooms.Empty();
+	// Restore collisions (the engine will do its thing and all rooms will be back again)
+	SetActorEnableCollision(true);
+
+	/*
+	 * P.S.: I know what I'm doing with the rooms seems out of place, but it's necessary.
+	 * If you don't trust me, try removing the first three and last two lines of code and watch how nothing works
+	 * when trying to call these functions from the edit page.
+	*/
 }
 
 

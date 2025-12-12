@@ -358,7 +358,7 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
             for (FVector3f normal : projectionPlanesNormals)
             {
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( (point - _nodes[parent].Position).GetSafeNormal() , normal) < -0.5f )
+                if ( FVector3f::DotProduct( (point - _nodes[parent].Position).GetSafeNormal() , normal) < -1 )
                 {
                     _beam++;
 
