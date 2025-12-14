@@ -21,9 +21,6 @@ public:
     AIS_Source();
 
 private:
-    // The Image Sources trees
-    //ISTree tree = ISTree(0, 0, FVector3f::Zero(), nullptr, false, false, false, false);;
-
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, ISTree> trees;
 
@@ -35,6 +32,10 @@ public:
     /* The trace channel for sound reflection. */
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
+
+    /* The trace channel for sound reflection. */
+    UPROPERTY(EditAnywhere)
+    bool EnableMultithreading;
 
     /* Set to true to activate IS generation (only in play mode) */
     UPROPERTY(EditAnywhere)
@@ -119,7 +120,7 @@ protected:
 private:
     // Generates Image Sources position with the given parameters
     UFUNCTION(BlueprintCallable)
-    void GenerateISPositions();
+    void GenerateISs();
     
     // Generates paths for sound reflections, checking if the sound reaches the listener
     UFUNCTION(BlueprintCallable)
@@ -128,6 +129,12 @@ private:
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)
     void DrawDebug();
+
+    void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
+
+    void GenerateISsMT(AIS_Listener* listener, FVector3f position);
+
+    TFuture<ISTree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
     
 
 
