@@ -21,9 +21,6 @@ public:
     AIS_Source();
 
 private:
-    // The Image Sources trees
-    //ISTree tree = ISTree(0, 0, FVector3f::Zero(), nullptr, false, false, false, false);;
-
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, ISTree> trees;
 
@@ -136,6 +133,8 @@ private:
     void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
 
     void GenerateISsMT(AIS_Listener* listener, FVector3f position);
+
+    TFuture<ISTree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
     
 
 

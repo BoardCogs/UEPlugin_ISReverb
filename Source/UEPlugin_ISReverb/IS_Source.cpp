@@ -52,6 +52,7 @@ void AIS_Source::GenerateISs()
 		{
 			GenerateISsLinear(listener, position);
 		}
+		else
 		{
 			GenerateISsMT(listener, position);
 		}
@@ -84,7 +85,33 @@ void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 
 void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 {
-	
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async IS generation"));
+
+	CreateISTreeTask(listener, position)
+		.Next([this, listener](const ISTree& tree)
+		{
+			AsyncTask(ENamedThreads::GameThread, [this, listener, tree]()
+			{
+				trees.Add(listener, tree);
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
+			});
+		});
+}
+
+
+
+TFuture<ISTree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f position)
+{
+	TSharedRef<TPromise<ISTree>> Promise = MakeShared<TPromise<ISTree>>();
+	TFuture<ISTree> Future = Promise->GetFuture();
+
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, position, Promise]() mutable
+	{
+		ISTree tree = ISTree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
+		Promise->SetValue(tree);
+	});
+
+	return Future;
 }
 
 
