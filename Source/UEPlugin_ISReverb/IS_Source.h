@@ -36,6 +36,10 @@ public:
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
 
+    /* The trace channel for sound reflection. */
+    UPROPERTY(EditAnywhere)
+    bool EnableMultithreading;
+
     /* Set to true to activate IS generation (only in play mode) */
     UPROPERTY(EditAnywhere)
     bool generateImageSources = false;
@@ -119,7 +123,7 @@ protected:
 private:
     // Generates Image Sources position with the given parameters
     UFUNCTION(BlueprintCallable)
-    void GenerateISPositions();
+    void GenerateISs();
     
     // Generates paths for sound reflections, checking if the sound reaches the listener
     UFUNCTION(BlueprintCallable)
@@ -128,6 +132,10 @@ private:
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)
     void DrawDebug();
+
+    void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
+
+    void GenerateISsMT(AIS_Listener* listener, FVector3f position);
     
 
 

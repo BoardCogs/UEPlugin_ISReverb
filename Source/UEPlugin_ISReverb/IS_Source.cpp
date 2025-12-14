@@ -19,14 +19,8 @@ void AIS_Source::BeginPlay()
 
 
 
-void AIS_Source::GenerateISPositions()
+void AIS_Source::GenerateISs()
 {
-	/*
-	// Disable drawing ISs for faster computation
-	bool _backUpDrawISs = drawImageSources;
-	drawImageSources = false;
-	*/
-
 	// Getting all listeners
 	TArray<AActor*> listeners; 
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIS_Listener::StaticClass(), listeners);
@@ -37,35 +31,60 @@ void AIS_Source::GenerateISPositions()
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Inside listeners loop"));
 		AIS_Listener* listener = Cast<AIS_Listener>(actor);
 
+		FVector3f position;
+
 		// If listener and source are in the same room, generate ISs using that room's surfaces
 		if ( RoomsInCommon(listener->GetRooms(), _rooms) )
 		{
-			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source in the same room(s)"));
-			
-			// Generates ISTree and adds it to the array
-			ISTree tree = ISTree(order, FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ), listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
-			trees.Add(listener, tree);
-
-			// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
-			if (debugBeamTracing)
-			{
-				inactiveNodes.Empty();
-				TArray<IS*> nodes = tree.Nodes();
-
-				for (int i = 0 ; i < nodes.Num() ; i++)
-				{
-					if (!nodes[i]->Valid)
-						inactiveNodes.Add(i);
-				}
-			}
+			// Since the listener and source are in the same room, IS generation uses the source's actual position
+			position = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
 		}
 		else
 		{
 			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source are in separate rooms"));
+
+			// TODO: Set the source position after path finding
+			position = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
+		}
+
+		// Generate tree
+		if (!EnableMultithreading)
+		{
+			GenerateISsLinear(listener, position);
+		}
+		{
+			GenerateISsMT(listener, position);
 		}
 	}
+}
 
-	//drawImageSources = _backUpDrawISs;
+
+
+void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
+{
+	// Generates ISTree and adds it to the array
+	ISTree tree = ISTree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
+	trees.Add(listener, tree);
+
+	// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
+	if (debugBeamTracing)
+	{
+		inactiveNodes.Empty();
+		TArray<IS*> nodes = tree.Nodes();
+
+		for (int i = 0 ; i < nodes.Num() ; i++)
+		{
+			if (!nodes[i]->Valid)
+				inactiveNodes.Add(i);
+		}
+	}
+}
+
+
+
+void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
+{
+	
 }
 
 
@@ -263,7 +282,7 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 			{
 				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating ISs"));
 				generateImageSources = false;
-				GenerateISPositions();
+				GenerateISs();
 			}
 	
 			if (generateReflectionPaths == true)
