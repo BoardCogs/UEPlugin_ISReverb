@@ -131,11 +131,11 @@ private:
     // Generates paths for sound reflections, checking if the sound reaches the listener
     void GenerateAllReflectionPaths();
 
-    void GenerateRP(AIS_Listener* listener, ISTree& tree);
+    void GenerateRP(AIS_Listener* listener);
 
-    void GenerateRPLinear(AIS_Listener* listener, ISTree& tree);
+    void GenerateRPLinear(AIS_Listener* listener);
 
-    void GenerateRPMT(AIS_Listener* listener, ISTree& tree);
+    void GenerateRPMT(AIS_Listener* listener);
 
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)

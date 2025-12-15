@@ -80,7 +80,7 @@ void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 		}
 	}
 
-	GenerateRP(listener, trees[listener]);
+	GenerateRP(listener);
 }
 
 
@@ -97,7 +97,7 @@ void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 				trees.Add(listener, tree);
 				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
 
-				GenerateRP(listener, trees[listener]);
+				GenerateRP(listener);
 			});
 		});
 }
@@ -127,13 +127,13 @@ void AIS_Source::GenerateAllReflectionPaths()
     
 	for (TPair<AIS_Listener*, ISTree>& pair : trees)
 	{
-		GenerateRP(pair.Key, pair.Value);
+		GenerateRP(pair.Key);
 	}
 }
 
 
 
-void AIS_Source::GenerateRP(AIS_Listener* listener, ISTree& tree)
+void AIS_Source::GenerateRP(AIS_Listener* listener)
 {
 	//GenerateRPLinear(listener, tree);
 	
@@ -144,23 +144,23 @@ void AIS_Source::GenerateRP(AIS_Listener* listener, ISTree& tree)
 	}
 	else */if (EnableMultithreading)
 	{
-		GenerateRPMT(listener, tree);
+		GenerateRPMT(listener);
 	}
 	else
 	{
-		GenerateRPLinear(listener, tree);
+		GenerateRPLinear(listener);
 	}
 }
 
 
 
-void AIS_Source::GenerateRPLinear(AIS_Listener* listener, ISTree& tree)
+void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 {
 	FDateTime StartTime = FDateTime::UtcNow();
 	
 	FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 
-	TArray<IS*> nodes = tree.Nodes();
+	TArray<IS*> nodes = trees[listener].Nodes();
 
 	int validPaths = 0;
 
@@ -254,15 +254,17 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener, ISTree& tree)
 
 
 
-void AIS_Source::GenerateRPMT(AIS_Listener* listener, ISTree& tree)
+void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 {
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, &tree]()
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener]()
 	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
+		
 		FDateTime StartTime = FDateTime::UtcNow();
 	
 		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 
-		TArray<IS*> nodes = tree.Nodes();
+		TArray<IS*> nodes = trees[listener].Nodes();
 		
 		//std::atomic<int> validPaths = 0;;
 		
@@ -350,6 +352,8 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener, ISTree& tree)
 		});
 
 		int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
+
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
 		
 		UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
 									  "[Don't know how many] ISs with a valid path out of %i total ISs"),
