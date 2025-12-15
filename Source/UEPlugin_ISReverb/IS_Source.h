@@ -121,20 +121,25 @@ private:
     // Generates Image Sources position with the given parameters
     UFUNCTION(BlueprintCallable)
     void GenerateISs();
-    
-    // Generates paths for sound reflections, checking if the sound reaches the listener
-    UFUNCTION(BlueprintCallable)
-    void GenerateReflectionPaths();
-
-    // Draws and deletes helpers for all debug purposes, according to the properties
-    UFUNCTION(BlueprintCallable)
-    void DrawDebug();
 
     void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
 
     void GenerateISsMT(AIS_Listener* listener, FVector3f position);
 
     TFuture<ISTree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
+    
+    // Generates paths for sound reflections, checking if the sound reaches the listener
+    void GenerateAllReflectionPaths();
+
+    void GenerateRP(AIS_Listener* listener, ISTree& tree);
+
+    void GenerateRPLinear(AIS_Listener* listener, ISTree& tree);
+
+    void GenerateRPMT(AIS_Listener* listener, ISTree& tree);
+
+    // Draws and deletes helpers for all debug purposes, according to the properties
+    UFUNCTION(BlueprintCallable)
+    void DrawDebug();
     
 
 
