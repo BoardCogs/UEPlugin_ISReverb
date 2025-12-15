@@ -48,13 +48,13 @@ void AIS_Source::GenerateISs()
 		}
 
 		// Generate tree
-		if (!EnableMultithreading)
+		if (EnableMultithreading)
 		{
-			GenerateISsLinear(listener, position);
+			GenerateISsMT(listener, position);
 		}
 		else
 		{
-			GenerateISsMT(listener, position);
+			GenerateISsLinear(listener, position);
 		}
 	}
 }
@@ -135,22 +135,21 @@ void AIS_Source::GenerateAllReflectionPaths()
 
 void AIS_Source::GenerateRP(AIS_Listener* listener, ISTree& tree)
 {
-	GenerateRPLinear(listener, tree);
-
+	//GenerateRPLinear(listener, tree);
+	
 	/*
 	if (EnableRayTracing)
 	{
 		//GenerateRPRT(listener, tree);
 	}
-	else if (EnableMultithreading)
+	else */if (EnableMultithreading)
 	{
-		//GenerateRPMT(listener, tree);
+		GenerateRPMT(listener, tree);
 	}
 	else
 	{
-		//GenerateRPLinear(listener, tree);
+		GenerateRPLinear(listener, tree);
 	}
-	*/
 }
 
 
@@ -161,20 +160,22 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener, ISTree& tree)
 	
 	FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 
-	FHitResult hit;
-	FCollisionQueryParams traceParams;
-
 	TArray<IS*> nodes = tree.Nodes();
-	TArray<FVector3f> intersections;
 
 	int validPaths = 0;
-	int currentIndex;
-	IS* currentNode = nullptr;
-	FVector3f from;
-	FVector3f to;
 
 	for (IS* node : nodes)
 	{
+		FHitResult hit;
+		FCollisionQueryParams traceParams;
+		
+		TArray<FVector3f> intersections;
+
+		int currentIndex;
+		IS* currentNode = nullptr;
+		FVector3f from;
+		FVector3f to;
+		
 		if (node->Valid)
 		{
 			// Innocent until proven guilty
@@ -255,7 +256,105 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener, ISTree& tree)
 
 void AIS_Source::GenerateRPMT(AIS_Listener* listener, ISTree& tree)
 {
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, &tree]()
+	{
+		FDateTime StartTime = FDateTime::UtcNow();
 	
+		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
+
+		TArray<IS*> nodes = tree.Nodes();
+		
+		//std::atomic<int> validPaths = 0;;
+		
+		ParallelFor(nodes.Num(), [this, listenerPos, nodes](int32 index) mutable
+		{
+			IS* node = nodes[index];
+
+			FHitResult hit;
+			FCollisionQueryParams traceParams;
+			
+			TArray<FVector3f> intersections;
+
+			int currentIndex;
+			IS* currentNode = nullptr;
+			FVector3f from;
+			FVector3f to;
+
+			if (node->Valid)
+			{
+				// Innocent until proven guilty
+				node->HasPath = true;
+
+				intersections.Empty();
+
+				intersections.Add(listenerPos);
+
+				currentIndex = node->Index;
+				from = listenerPos;
+
+				while (currentIndex != -1)
+				{
+					currentNode = nodes[currentIndex];
+					to = currentNode->Position;
+
+					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
+
+					if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
+					{
+						AReflectorSurface* hitSurface = Cast<AReflectorSurface>( hit.GetActor() );
+
+						//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
+
+						if ( hitSurface != nullptr && hitSurface == currentNode->Surface )
+						{
+							intersections.Add( FVector3f( hit.ImpactPoint ) );
+							from = FVector3f( hit.ImpactPoint );
+						}
+						else
+						{
+							//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("But the wrong thing"));
+							intersections.Add( FVector3f( hit.ImpactPoint ) );
+							node->HasPath = false;
+							break;
+						}
+					}
+					else
+					{
+						intersections.Add(to);
+						node->HasPath = false;
+						break;
+					}
+
+					currentIndex = currentNode->Parent;
+				}
+
+				if (node->HasPath)
+				{
+					to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
+					
+					if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
+					{
+						intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
+						node->HasPath = true;
+						//validPaths++;
+					}
+					else
+					{
+						intersections.Add( FVector3f( hit.ImpactPoint ) );
+						node->HasPath = false;
+					}
+				}
+				
+				node->Path = TArray(intersections);
+			}
+		});
+
+		int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
+		
+		UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
+									  "[Don't know how many] ISs with a valid path out of %i total ISs"),
+									  TimeElapsedInMs, nodes.Num());
+	});
 }
 
 
