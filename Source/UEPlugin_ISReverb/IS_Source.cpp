@@ -250,6 +250,8 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 	UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
 								  "%i ISs with a valid path out of %i total ISs"),
 								  TimeElapsedInMs, validPaths, nodes.Num());
+								  
+	DrawDebug();
 }
 
 
@@ -265,8 +267,6 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 
 		TArray<IS*> nodes = trees[listener].Nodes();
-		
-		//std::atomic<int> validPaths = 0;;
 		
 		ParallelFor(nodes.Num(), [this, listenerPos, nodes](int32 index) mutable
 		{
@@ -338,7 +338,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 					{
 						intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
 						node->HasPath = true;
-						//validPaths++;
+						//validNodes.Increment();
 					}
 					else
 					{
@@ -350,14 +350,29 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 				node->Path = TArray(intersections);
 			}
 		});
-
-		int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
-
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
 		
-		UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
-									  "[Don't know how many] ISs with a valid path out of %i total ISs"),
-									  TimeElapsedInMs, nodes.Num());
+		int validISs = 0;
+		
+		for (IS* node : nodes)
+		{
+			if ( node->HasPath )
+				validISs++;
+		}
+
+		int totalISs = nodes.Num();
+
+		AsyncTask(ENamedThreads::GameThread, [this, StartTime, validISs, totalISs]()
+		{
+			int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
+
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
+			
+			UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
+										  "%i ISs with a valid path out of %i total ISs"),
+										  TimeElapsedInMs, validISs, totalISs);
+
+			DrawDebug();
+		});
 	});
 }
 
@@ -459,8 +474,6 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 				generateReflectionPaths = false;
 				GenerateAllReflectionPaths();
 			}
-
-			DrawDebug();
 		}
 		else
 		{
