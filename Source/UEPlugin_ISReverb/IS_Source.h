@@ -99,6 +99,8 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     TArray<int> inactiveNodes = TArray<int>();
 
+    FCriticalSection treesLock;
+
 
 
 protected:

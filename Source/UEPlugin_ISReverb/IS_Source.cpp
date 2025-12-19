@@ -92,9 +92,12 @@ void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 	CreateISTreeTask(listener, position)
 		.Next([this, listener](const ISTree& tree)
 		{
-			AsyncTask(ENamedThreads::GameThread, [this, listener, tree]()
+			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, tree]()
 			{
+				treesLock.Lock();
 				trees.Add(listener, tree);
+				treesLock.Unlock();
+				
 				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
 
 				GenerateRP(listener);
