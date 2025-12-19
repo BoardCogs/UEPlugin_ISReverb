@@ -267,8 +267,12 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 
 		TArray<IS*> nodes = trees[listener].Nodes();
+
+		int validISs = 0;
+
+		FCriticalSection validISsLock;
 		
-		ParallelFor(nodes.Num(), [this, listenerPos, nodes](int32 index) mutable
+		ParallelFor(nodes.Num(), [&](int32 index) mutable
 		{
 			IS* node = nodes[index];
 
@@ -338,7 +342,10 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 					{
 						intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
 						node->HasPath = true;
-						//validNodes.Increment();
+
+						validISsLock.Lock();
+						validISs++;
+						validISsLock.Unlock();
 					}
 					else
 					{
@@ -350,14 +357,6 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 				node->Path = TArray(intersections);
 			}
 		});
-		
-		int validISs = 0;
-		
-		for (IS* node : nodes)
-		{
-			if ( node->HasPath )
-				validISs++;
-		}
 
 		int totalISs = nodes.Num();
 
