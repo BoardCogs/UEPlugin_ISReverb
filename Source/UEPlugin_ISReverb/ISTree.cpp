@@ -4,7 +4,7 @@
 
 ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
-	if (r == 0)
+    if (r == 0)
         return;
     
     _ro = r;
@@ -28,29 +28,46 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
 
         _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], ISBeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
     }
+
+    FCriticalSection iLock;
+    FCriticalSection nodesLock;
+    FCriticalSection noDoubleLock;
+    FCriticalSection wrongSideLock;
+    FCriticalSection beamLock;
+    FCriticalSection realISsLock;
     
     // Creating all ISs from second order onward
     for (int i = _sn, order = 2 ; order <= _ro ; order++)
     {
         // Sets the first IS of the currently considered order of reflection
         firstNodeOfOrder.Add(i);
-
-        // Checks on all ISs belonging to the previous order, acting as parents for new Image Sources
-        for (int p = firstNodeOfOrder[order-1] ; p < firstNodeOfOrder[order] ; p++)
+        
+        ParallelFor(firstNodeOfOrder[order] - firstNodeOfOrder[order - 1],
+        [&](int32 index)
         {
-            if (!_nodes[p].Valid)
-                continue;
-
-            // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-            TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( _nodes[p].Position, _nodes[p].BeamPoints );
-
-            // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
-            for (int s = 0 ; s < _sn ; s++)
+            int p = firstNodeOfOrder[order - 1] + index;
+            
+            nodesLock.Lock();
+            IS* node = &_nodes[p];
+            nodesLock.Unlock();
+            
+            if (node->Valid)
             {
-                if ( CreateIS(i, order, p, _surfaces[s], projectionPlanesNormals) )
-                    i++;
+                // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
+
+                // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
+                for (int s = 0 ; s < _sn ; s++)
+                {
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, beamLock, realISsLock) )
+                    {
+                        iLock.Lock();
+                        i++;
+                        iLock.Unlock();
+                    }
+                }   
             }
-        }
+        });
     }
 
     int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
@@ -71,19 +88,26 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals)
+bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
 {
+    nodesLock.Lock();
+    IS* parentNode = &_nodes[parent];
+    nodesLock.Unlock();
+    
 	// 1
     // Checking that no IS is created identifying a reflection on the same surface twice in a row
     // This is because a double reflection is impossible assuming flat surfaces
-    if ( surface == _nodes[parent].Surface )
+    if ( surface == parentNode->Surface )
     {
+        noDoubleLock.Lock();
         _noDouble++;
+        noDoubleLock.Unlock();
+        
         return false;
     }
 
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
-    FVector3f pos = _nodes[parent].Position;
+    FVector3f pos = parentNode->Position;
     pos -= 2 * FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) * surface->Normal();
 
 
@@ -92,7 +116,10 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
     // Checking that the IS is not on the wrong side of the reflector, standing on the opposite side of the surface's normal
     if ( _wrongSideOfReflector && FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) >= 0 )
     {
+        wrongSideLock.Lock();
         _wrongSide++;
+        wrongSideLock.Unlock();
+        
         return false;
     }
 
@@ -133,7 +160,7 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                 ReflectorEdge edge = beam.Edges()[e];
 
                 // Checks if the edge intersects the plane
-                if ( !blackList.Contains(edge) && LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, _nodes[parent].Position ) )
+                if ( !blackList.Contains(edge) && LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentNode->Position ) )
                 {
                     // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
                     bool doNothing = false;
@@ -143,7 +170,7 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                     // Check if intersection is on the edge extremes
                     if ((intersection - edge.PointA).Length() <= 0.02f)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointB - _nodes[parent].Position).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointB - parentNode->Position).GetSafeNormal() ) >= 0 )
                         {
                             // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
                             // The edge is included almost entirely, nothing to do here
@@ -158,7 +185,7 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                     }
                     else if ((intersection - edge.PointB).Length() <= 0.02f)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointA - _nodes[parent].Position).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointA - parentNode->Position).GetSafeNormal() ) >= 0 )
                         {
                             // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
                             // The edge is included almost entirely, nothing to do here
@@ -177,7 +204,7 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                     if (!doNothing)
                     {
                         // The point that is on the correct semispace of the plane (to be kept)
-                        inPoint = FVector3f::DotProduct( normal, (edge.PointA - _nodes[parent].Position).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - _nodes[parent].Position).GetSafeNormal() ) ? edge.PointA : edge.PointB;
+                        inPoint = FVector3f::DotProduct( normal, (edge.PointA - parentNode->Position).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - parentNode->Position).GetSafeNormal() ) ? edge.PointA : edge.PointB;
                         // The point that is on the other semispace of the plane (to be removed)
                         outPoint = inPoint == edge.PointA ? edge.PointB : edge.PointA;
 
@@ -191,7 +218,7 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                             otherPoint = otherEdge.PointA == outPoint ? otherEdge.PointB : otherEdge.PointA;
 
                             // Checks if the other edge has also an intersection with the same projection plane
-                            if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, _nodes[parent].Position))
+                            if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, parentNode->Position))
                             {
                                 // The second intersection is near the other point
                                 if ((secondIntersection - otherPoint).Length() <= 0.02f)
@@ -298,13 +325,17 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
 
                             // If the other edge has not been found, some approximation error has occurred
                             // This means the projection is extremely small -> let's remove it altogether
+                            beamLock.Lock();
                             _beam++;
+                            beamLock.Unlock();
 
                             if (_debugBeamTracing)
                             {
-                                UE_LOG(LogTemp, Display, TEXT("Other edge not found for node %i"), i);
+                                nodesLock.Lock();
                                 
-                                _nodes.Add( IS(i, order, parent, pos, surface, beam, false ) );
+                                _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, beam, false ) );
+
+                                nodesLock.Unlock();
                                 
                                 return true;
                             }
@@ -331,13 +362,17 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
         // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
         if (beam.Points().Num() <= 2 || beam.Edges().Num() <= 2)
         {
+            beamLock.Lock();
             _beam++;
+            beamLock.Unlock();
 
             if (_debugBeamTracing)
             {
-                UE_LOG(LogTemp, Display, TEXT("Only a line or point remains for node %i"), i);
+                nodesLock.Lock();
                 
-                _nodes.Add( IS(i, order, parent, pos, surface, beam, false ) );
+                _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, beam, false ) );
+
+                nodesLock.Unlock();
                 
                 return true;
             }
@@ -353,22 +388,19 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
             for (FVector3f normal : projectionPlanesNormals)
             {
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( (point - _nodes[parent].Position).GetSafeNormal() , normal) < -1 )
+                if ( FVector3f::DotProduct( (point - parentNode->Position).GetSafeNormal() , normal) < -1 )
                 {
+                    beamLock.Lock();
                     _beam++;
+                    beamLock.Unlock();
 
                     if (_debugBeamTracing)
                     {
-                        /*
-                        if (i == 42 || i == 44)
-                        {
-                            UE_LOG(LogTemp, Display, TEXT("A point falls outside the projection planes for node %i. Precisely, the yellow point falls outside the red plane"), i);
-                            DrawDebugPoint(Rooms[0]->GetWorld(), FVector(point), 50, FColor::Yellow, false, 50000, 0);
-                            DrawDebugSolidPlane(Rooms[0]->GetWorld(), FPlane(FVector(_nodes[parent].Position), FVector(normal)), FVector(_nodes[parent].Position), 50.0f, FColor::Red, false, 50000, 0);
-                        }
-                        */
+                        nodesLock.Lock();
                         
-                        _nodes.Add( IS(i, order, parent, pos, surface, beam, false ) );
+                        _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, beam, false ) );
+
+                        nodesLock.Unlock();
                         
                         return true;
                     }
@@ -382,14 +414,19 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
     }
 
 
-
+    nodesLock.Lock();
+    
     // IS is created and its position is given
     if (_beamClipping)
-        _nodes.Add( IS(i, order, parent, pos, surface, beam ) );
+        _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, beam ) );
     else
-        _nodes.Add( IS(i, order, parent, pos, surface, ISBeamProjection( surface->Points() , surface->Edges() ) ) );
+        _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, ISBeamProjection( surface->Points() , surface->Edges() ) ) );
 
+    nodesLock.Unlock();
+
+    realISsLock.Lock();
     _realISs++;
+    realISsLock.Unlock();
 
     return true;
 }
@@ -468,7 +505,7 @@ TArray<IS*> ISTree::Nodes()
 
     for (int i = 0; i < _nodes.Num(); i++)
     {
-        nodes.Add(&_nodes[i]);    
+        nodes.Add(&_nodes[i]);
     }
     
 	return nodes;
