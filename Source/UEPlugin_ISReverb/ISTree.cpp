@@ -1,6 +1,6 @@
 #include "ISTree.h"
 
-#include <string>
+
 
 ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {

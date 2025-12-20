@@ -1,11 +1,10 @@
 #pragma once
 
-#include <__msvc_ranges_to.hpp>
-
 #include "CoreMinimal.h"
 #include "ISTree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/ObjectMacros.h"
 #include "IS_Source.generated.h"
 

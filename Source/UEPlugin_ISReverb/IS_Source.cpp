@@ -1,6 +1,6 @@
 #include "IS_Source.h"
 
-#include <string>
+
 
 // Sets default values
 AIS_Source::AIS_Source()

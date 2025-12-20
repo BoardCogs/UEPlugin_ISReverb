@@ -4,7 +4,8 @@
 #include "IS.h"
 #include "ReflectorSurface.h"
 #include "Room.h"
-#include "Kismet/GameplayStatics.h"
+
+
 
 /**
  * A tree containing all ISs generated for a source using a room's reflectors. 
