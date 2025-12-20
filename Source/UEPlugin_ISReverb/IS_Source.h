@@ -1,11 +1,10 @@
 #pragma once
 
-#include <__msvc_ranges_to.hpp>
-
 #include "CoreMinimal.h"
 #include "ISTree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
+#include "Kismet/GameplayStatics.h"
 #include "UObject/ObjectMacros.h"
 #include "IS_Source.generated.h"
 
@@ -99,18 +98,13 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     TArray<int> inactiveNodes = TArray<int>();
 
+    FCriticalSection treesLock;
+
 
 
 protected:
     // Called when the game starts or when spawned
     virtual void BeginPlay() override;
-    /*
-    {
-        GenerateISPositions();
-
-        GenerateReflectionPaths();
-    }
-    */
 
     // Called upon changes made in the editor.
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -121,20 +115,25 @@ private:
     // Generates Image Sources position with the given parameters
     UFUNCTION(BlueprintCallable)
     void GenerateISs();
-    
-    // Generates paths for sound reflections, checking if the sound reaches the listener
-    UFUNCTION(BlueprintCallable)
-    void GenerateReflectionPaths();
-
-    // Draws and deletes helpers for all debug purposes, according to the properties
-    UFUNCTION(BlueprintCallable)
-    void DrawDebug();
 
     void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
 
     void GenerateISsMT(AIS_Listener* listener, FVector3f position);
 
     TFuture<ISTree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
+    
+    // Generates paths for sound reflections, checking if the sound reaches the listener
+    void GenerateAllReflectionPaths();
+
+    void GenerateRP(AIS_Listener* listener);
+
+    void GenerateRPLinear(AIS_Listener* listener);
+
+    void GenerateRPMT(AIS_Listener* listener);
+
+    // Draws and deletes helpers for all debug purposes, according to the properties
+    UFUNCTION(BlueprintCallable)
+    void DrawDebug();
     
 
 

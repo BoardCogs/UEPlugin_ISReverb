@@ -1,6 +1,6 @@
 #include "ISTree.h"
 
-#include <string>
+
 
 ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
@@ -20,18 +20,13 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
 
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
-    TArray<FVector3f> projectionPlanesNormals = TArray<FVector3f>();
-
     // Creating the first order ISs
     for (int i = 0; i < _sn ; i++, _realISs++)
     {
-        _nodes.Add( IS( i, 1, -1, _surfaces[i], ISBeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
-
         FVector3f pos = sourcePos;
-            
         pos -= 2 * FVector3f::DotProduct(_surfaces[i]->Normal(),pos - _surfaces[i]->Origin()) * _surfaces[i]->Normal();
 
-        _nodes[i].Position = pos;
+        _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], ISBeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
     }
     
     // Creating all ISs from second order onward
@@ -47,7 +42,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
                 continue;
 
             // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-            projectionPlanesNormals = CreateProjectionPlanes( _nodes[p].Position, _nodes[p].BeamPoints );
+            TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( _nodes[p].Position, _nodes[p].BeamPoints );
 
             // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
             for (int s = 0 ; s < _sn ; s++)
@@ -309,8 +304,8 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                             {
                                 UE_LOG(LogTemp, Display, TEXT("Other edge not found for node %i"), i);
                                 
-                                _nodes.Add( IS(i, order, parent, surface, beam, false ) );
-                                _nodes[i].Position = pos;
+                                _nodes.Add( IS(i, order, parent, pos, surface, beam, false ) );
+                                
                                 return true;
                             }
                             else
@@ -342,8 +337,8 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
             {
                 UE_LOG(LogTemp, Display, TEXT("Only a line or point remains for node %i"), i);
                 
-                _nodes.Add( IS(i, order, parent, surface, beam, false ) );
-                _nodes[i].Position = pos;
+                _nodes.Add( IS(i, order, parent, pos, surface, beam, false ) );
+                
                 return true;
             }
             else
@@ -373,8 +368,8 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
                         }
                         */
                         
-                        _nodes.Add( IS(i, order, parent, surface, beam, false ) );
-                        _nodes[i].Position = pos;
+                        _nodes.Add( IS(i, order, parent, pos, surface, beam, false ) );
+                        
                         return true;
                     }
                     else
@@ -390,11 +385,9 @@ bool ISTree::CreateIS(int i, int order, int parent, AReflectorSurface* surface, 
 
     // IS is created and its position is given
     if (_beamClipping)
-        _nodes.Add( IS(i, order, parent, surface, beam ) );
+        _nodes.Add( IS(i, order, parent, pos, surface, beam ) );
     else
-        _nodes.Add( IS(i, order, parent, surface, ISBeamProjection( surface->Points() , surface->Edges() ) ) );
-
-    _nodes[i].Position = pos;
+        _nodes.Add( IS(i, order, parent, pos, surface, ISBeamProjection( surface->Points() , surface->Edges() ) ) );
 
     _realISs++;
 

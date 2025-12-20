@@ -11,7 +11,7 @@ class UEPLUGIN_ISREVERB_API IS
 {
 public:
 	// CONSTRUCTOR
-	IS(int i, int o, int p, AReflectorSurface* s, ISBeamProjection beam, bool v = true);
+	IS(int i, int order, int parent, FVector3f pos, AReflectorSurface* surface, ISBeamProjection beam, bool valid = true);
 
 	// PROPERTIES
 	// The index of this Image Source in its ISTree
