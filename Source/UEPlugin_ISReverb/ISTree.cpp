@@ -20,8 +20,6 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
 
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
-    TArray<FVector3f> projectionPlanesNormals = TArray<FVector3f>();
-
     // Creating the first order ISs
     for (int i = 0; i < _sn ; i++, _realISs++)
     {
@@ -44,7 +42,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
                 continue;
 
             // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-            projectionPlanesNormals = CreateProjectionPlanes( _nodes[p].Position, _nodes[p].BeamPoints );
+            TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( _nodes[p].Position, _nodes[p].BeamPoints );
 
             // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
             for (int s = 0 ; s < _sn ; s++)
