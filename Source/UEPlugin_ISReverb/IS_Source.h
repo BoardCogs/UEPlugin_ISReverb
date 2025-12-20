@@ -106,13 +106,6 @@ public:
 protected:
     // Called when the game starts or when spawned
     virtual void BeginPlay() override;
-    /*
-    {
-        GenerateISPositions();
-
-        GenerateReflectionPaths();
-    }
-    */
 
     // Called upon changes made in the editor.
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
