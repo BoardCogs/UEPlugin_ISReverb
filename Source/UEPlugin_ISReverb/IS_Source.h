@@ -32,7 +32,7 @@ public:
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
 
-    /* The trace channel for sound reflection. */
+    /* Set to true to enable using multithreading on CPU-heavy computations (recommended). */
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
 
