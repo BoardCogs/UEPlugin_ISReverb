@@ -5,6 +5,8 @@
 #include "GameFramework/Actor.h"
 #include "ReflectorSurface.generated.h"
 
+
+
 /**
  * A surface upon which sound reflects.
  * A surface needs to be represented by a convex polygon, defined by its points and edges.

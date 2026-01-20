@@ -3,6 +3,8 @@
 #include "ReflectorEdge.h"
 #include "CoreMinimal.h"
 
+
+
 /**
  * Projection of the father IS's beam onto the surface of a lower order IS.
  * Each projection is represented by a convex polygon, defined by its points and edges.

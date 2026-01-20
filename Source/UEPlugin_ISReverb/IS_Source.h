@@ -8,8 +8,11 @@
 #include "UObject/ObjectMacros.h"
 #include "IS_Source.generated.h"
 
+
+
 /**
- * 
+ * Actor that tracks the position of a sound source in the scene.
+ * Responsible for generating ISs and simulating sound rays for reverberation.
  */
 UCLASS(Blueprintable)
 class UEPLUGIN_ISREVERB_API AIS_Source : public AIS_RoomTracker
