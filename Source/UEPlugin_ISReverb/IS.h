@@ -4,6 +4,8 @@
 #include "ISBeamProjection.h"
 #include "ReflectorSurface.h"
 
+
+
 /**
  * An Image Source, representing a possible reflection path from sound source to listener along a specific set of surfaces.
  */

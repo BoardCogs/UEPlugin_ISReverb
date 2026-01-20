@@ -5,6 +5,11 @@
 #include "GameFramework/Actor.h"
 #include "IS_RoomTracker.generated.h"
 
+
+
+/**
+ * An actor that tracks the room(s) it's currently in.
+ */
 UCLASS(Abstract)
 class UEPLUGIN_ISREVERB_API AIS_RoomTracker : public AActor
 {
