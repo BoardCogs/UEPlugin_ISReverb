@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReflectorSurface.h"
+#include "IS_ReflectorSurface.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "IS_Room.generated.h"
@@ -38,7 +38,7 @@ public:
 	bool VisibleInGame;
 	
 	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
-	TArray<AReflectorSurface*> Surfaces;
+	TArray<AIS_ReflectorSurface*> Surfaces;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int SurfaceNumber;

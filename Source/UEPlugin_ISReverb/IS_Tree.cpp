@@ -88,7 +88,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool IS_Tree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
+bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
 {
     nodesLock.Lock();
     IS* parentNode = &_nodes[parent];
@@ -514,9 +514,9 @@ TArray<IS*> IS_Tree::Nodes()
 
 
 // All reflectors in the scene
-TArray<AReflectorSurface*> IS_Tree::Surfaces()
+TArray<AIS_ReflectorSurface*> IS_Tree::Surfaces()
 {
-    TArray<AReflectorSurface*> surfaces = TArray<AReflectorSurface*>();
+    TArray<AIS_ReflectorSurface*> surfaces = TArray<AIS_ReflectorSurface*>();
     
     for (AIS_Room* room : Rooms)
     {

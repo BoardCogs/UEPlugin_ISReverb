@@ -36,9 +36,9 @@ void AIS_Room::GetReflectors()
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, ChildActor->GetChildActorName().ToString() );
 
 		// If a child actor is a reflector surface it goes into the array of surfaces
-		if (ChildActor->GetChildActor()->IsA(AReflectorSurface::StaticClass()))
+		if (ChildActor->GetChildActor()->IsA(AIS_ReflectorSurface::StaticClass()))
 		{
-			Surfaces.Add(Cast<AReflectorSurface>(ChildActor->GetChildActor()));
+			Surfaces.Add(Cast<AIS_ReflectorSurface>(ChildActor->GetChildActor()));
 
 			// Turning surfaces invisible unless the VisibleInGame toggle is on 
 			if (!VisibleInGame)
@@ -59,7 +59,7 @@ void AIS_Room::GetReflectors()
 
 	// Giving all reflectors a room-relative id 
 	int i = 0;
-	for (AReflectorSurface* s : Surfaces)
+	for (AIS_ReflectorSurface* s : Surfaces)
 	{
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Processing surface number %i"), i));
 		s->ID = i;
@@ -87,7 +87,7 @@ void AIS_Room::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEven
 			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("On it"));
 			
 			// Change visibility of all surfaces according to the property's value
-			for (AReflectorSurface* s : Surfaces)
+			for (AIS_ReflectorSurface* s : Surfaces)
 			{
 				TArray<UStaticMeshComponent*> Planes;
 				s->GetComponents<UStaticMeshComponent>(Planes);

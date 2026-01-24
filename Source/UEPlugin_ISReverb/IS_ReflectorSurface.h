@@ -3,7 +3,7 @@
 #include "IS_ReflectorEdge.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "ReflectorSurface.generated.h"
+#include "IS_ReflectorSurface.generated.h"
 
 
 
@@ -12,14 +12,14 @@
  * A surface needs to be represented by a convex polygon, defined by its points and edges.
  */
 UCLASS(Blueprintable)
-class UEPLUGIN_ISREVERB_API AReflectorSurface : public AActor
+class UEPLUGIN_ISREVERB_API AIS_ReflectorSurface : public AActor
 {
 	GENERATED_BODY()
 	
 public:
 	// CONSTRUCTOR
 	// Sets default values for this actor's properties
-	AReflectorSurface();
+	AIS_ReflectorSurface();
 
 protected:
 	// METHODS

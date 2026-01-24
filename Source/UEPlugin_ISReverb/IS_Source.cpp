@@ -200,7 +200,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 				if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
 				{
-					AReflectorSurface* hitSurface = Cast<AReflectorSurface>( hit.GetActor() );
+					AIS_ReflectorSurface* hitSurface = Cast<AIS_ReflectorSurface>( hit.GetActor() );
 
 					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
 
@@ -310,7 +310,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 
 					if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
 					{
-						AReflectorSurface* hitSurface = Cast<AReflectorSurface>( hit.GetActor() );
+						AIS_ReflectorSurface* hitSurface = Cast<AIS_ReflectorSurface>( hit.GetActor() );
 
 						//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
 

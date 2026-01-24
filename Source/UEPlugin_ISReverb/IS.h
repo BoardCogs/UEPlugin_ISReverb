@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "IS_BeamProjection.h"
-#include "ReflectorSurface.h"
+#include "IS_ReflectorSurface.h"
 
 
 
@@ -13,7 +13,7 @@ class UEPLUGIN_ISREVERB_API IS
 {
 public:
 	// CONSTRUCTOR
-	IS(int i, int order, int parent, FVector3f pos, AReflectorSurface* surface, IS_BeamProjection beam, bool valid = true);
+	IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surface, IS_BeamProjection beam, bool valid = true);
 
 	// PROPERTIES
 	// The index of this Image Source in its ISTree
@@ -26,7 +26,7 @@ public:
 	int Parent;
 
 	// The index of this Image Source's reflector
-	AReflectorSurface* Surface;
+	AIS_ReflectorSurface* Surface;
 
 	// The position of the Image Source
 	FVector3f Position = FVector3f::Zero();

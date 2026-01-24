@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "IS.h"
-#include "ReflectorSurface.h"
+#include "IS_ReflectorSurface.h"
 #include "IS_Room.h"
 
 
@@ -54,14 +54,14 @@ private:
     // Generates ISs that would be shaved by beam tracing and clipping as inactive ISs, allows to check wether the optimization is accurate or not
     bool _debugBeamTracing;
 
-	TArray<AReflectorSurface*> _surfaces;
+	TArray<AIS_ReflectorSurface*> _surfaces;
 
 	// METHODS
     // All reflectors in the scene
-    TArray<AReflectorSurface*> Surfaces();
+    TArray<AIS_ReflectorSurface*> Surfaces();
 
     // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-    bool CreateIS(int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock);
+    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock);
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
     TArray<FVector3f> CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection);

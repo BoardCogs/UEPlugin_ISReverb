@@ -1,6 +1,6 @@
 #include "IS.h"
 
-IS::IS(int i, int order, int parent, FVector3f pos, AReflectorSurface* surface, IS_BeamProjection beam, bool valid)
+IS::IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surface, IS_BeamProjection beam, bool valid)
 {
 	Index = i;
 	Order = order;

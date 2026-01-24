@@ -1,9 +1,9 @@
-#include "ReflectorSurface.h"
+#include "IS_ReflectorSurface.h"
 
 
 
 // Sets default values
-AReflectorSurface::AReflectorSurface()
+AIS_ReflectorSurface::AIS_ReflectorSurface()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
@@ -12,7 +12,7 @@ AReflectorSurface::AReflectorSurface()
 
 
 // Called when the game starts or when spawned
-void AReflectorSurface::BeginPlay()
+void AIS_ReflectorSurface::BeginPlay()
 {
 	Super::BeginPlay();
 
@@ -55,25 +55,25 @@ void AReflectorSurface::BeginPlay()
 
 
 // Returns the origin point of this surface in world coordinates
-FVector3f AReflectorSurface::Origin()
+FVector3f AIS_ReflectorSurface::Origin()
 {
 	return FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
 }
 
 // Returns the normal of this surface as a unit vector
-FVector3f AReflectorSurface::Normal()
+FVector3f AIS_ReflectorSurface::Normal()
 {
 	return (FVector3f( GetTransform().TransformPosition(FVector3d(0,0,10)) ) - Origin()).GetSafeNormal();
 }
 
 // Returns all points of the surface polygon
-TArray<FVector3f> AReflectorSurface::Points()
+TArray<FVector3f> AIS_ReflectorSurface::Points()
 {
 	return _points;
 }
 
 // Returns all edges of the surface polygon
-TArray<IS_ReflectorEdge> AReflectorSurface::Edges()
+TArray<IS_ReflectorEdge> AIS_ReflectorSurface::Edges()
 {
 	return _edges;
 }
