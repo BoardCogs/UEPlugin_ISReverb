@@ -12,7 +12,7 @@ void AIS_Listener::UpdateCurrentRoom()
 	{
 		Room.Append(TEXT(":"));
 		
-		for (ARoom* room : _rooms)
+		for (AIS_Room* room : _rooms)
 		{
 			Room.Append(TEXT(" "));
 			Room.Append(room->Name);

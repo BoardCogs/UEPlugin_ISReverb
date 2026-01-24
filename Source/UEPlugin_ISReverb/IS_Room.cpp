@@ -1,9 +1,9 @@
-#include "Room.h"
+#include "IS_Room.h"
 
 
 
 // Sets default values
-ARoom::ARoom()
+AIS_Room::AIS_Room()
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
@@ -13,7 +13,7 @@ ARoom::ARoom()
 
 
 // Called when the game starts or when spawned
-void ARoom::BeginPlay()
+void AIS_Room::BeginPlay()
 {
 	Super::BeginPlay();
 	
@@ -23,7 +23,7 @@ void ARoom::BeginPlay()
 
 
 // Collects all reflector surfaces attached to this room
-void ARoom::GetReflectors()
+void AIS_Room::GetReflectors()
 {
 	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Getting reflectors"));
 	
@@ -72,7 +72,7 @@ void ARoom::GetReflectors()
 
 
 
-void ARoom::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+void AIS_Room::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 

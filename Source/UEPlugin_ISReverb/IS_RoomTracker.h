@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Room.h"
+#include "IS_Room.h"
 #include "GameFramework/Actor.h"
 #include "IS_RoomTracker.generated.h"
 
@@ -26,20 +26,20 @@ protected:
 public:	
 	// Called whenever entering a room collider
 	UFUNCTION(BlueprintCallable)
-	void OnEnterRoomCollider(ARoom* room);
+	void OnEnterRoomCollider(AIS_Room* room);
 	
 	// Called whenever exiting a room collider
 	UFUNCTION(BlueprintCallable)
-	void OnExitRoomCollider(ARoom* room);
+	void OnExitRoomCollider(AIS_Room* room);
 
 	// Returns the rooms in which this object is present
 	UFUNCTION(BlueprintCallable)
-	TArray<ARoom*> GetRooms();
+	TArray<AIS_Room*> GetRooms();
 	
 protected:
-	TArray<ARoom*> _rooms;
+	TArray<AIS_Room*> _rooms;
 
-	TMap<ARoom*, int> _counter;
+	TMap<AIS_Room*, int> _counter;
 
 	// Called every time OnEnter or OnExit add or remove a room
 	virtual void UpdateCurrentRoom();

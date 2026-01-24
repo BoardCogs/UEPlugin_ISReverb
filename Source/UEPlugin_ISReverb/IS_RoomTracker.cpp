@@ -18,7 +18,7 @@ void AIS_RoomTracker::BeginPlay()
 
 
 // Called whenever entering a room collider
-void AIS_RoomTracker::OnEnterRoomCollider(ARoom* room)
+void AIS_RoomTracker::OnEnterRoomCollider(AIS_Room* room)
 {
 	// If this room isn't already in its tracker, insert it
 	if (!_rooms.Contains(room))
@@ -36,7 +36,7 @@ void AIS_RoomTracker::OnEnterRoomCollider(ARoom* room)
 
 
 // Called whenever exiting a room collider
-void AIS_RoomTracker::OnExitRoomCollider(ARoom* room)
+void AIS_RoomTracker::OnExitRoomCollider(AIS_Room* room)
 {
 	// Decrease the counter
 	_counter.Add(room, _counter[room]--);
@@ -61,7 +61,7 @@ void AIS_RoomTracker::UpdateCurrentRoom()
 
 
 // Returns the rooms in which this object is present
-TArray<ARoom*> AIS_RoomTracker::GetRooms()
+TArray<AIS_Room*> AIS_RoomTracker::GetRooms()
 {
 	return _rooms;
 }

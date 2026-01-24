@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "IS.h"
 #include "ReflectorSurface.h"
-#include "Room.h"
+#include "IS_Room.h"
 
 
 
@@ -17,7 +17,7 @@ public:
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    IS_Tree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
+    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
 
 private:
 	// PROPERTIES
@@ -72,7 +72,7 @@ private:
 public:
 	// PROPERTIES
 	// The Room from which to take surfaces
-	TArray<ARoom*> Rooms;
+	TArray<AIS_Room*> Rooms;
 
 	// METHODS
     // For public access

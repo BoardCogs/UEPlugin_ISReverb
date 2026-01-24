@@ -406,9 +406,9 @@ int AIS_Source::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoi
 
 
 
-bool AIS_Source::RoomsInCommon(TArray<ARoom*> a, TArray<ARoom*> b)
+bool AIS_Source::RoomsInCommon(TArray<AIS_Room*> a, TArray<AIS_Room*> b)
 {
-	for (ARoom* room : a)
+	for (AIS_Room* room : a)
 	{
 		if (b.Contains(room))
 			return true;
@@ -429,7 +429,7 @@ void AIS_Source::UpdateCurrentRoom()
 	{
 		Room.Append(TEXT(":"));
 		
-		for (ARoom* room : _rooms)
+		for (AIS_Room* room : _rooms)
 		{
 			Room.Append(TEXT(" "));
 			Room.Append(room->Name);
@@ -448,7 +448,7 @@ void AIS_Source::UpdateCurrentRoom()
 void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	// Saving a backup of current rooms
-	TArray<ARoom*> RoomsBackup = _rooms;
+	TArray<AIS_Room*> RoomsBackup = _rooms;
 	// Disabling all collisions (the engine will reset them upon calling Super anyway)
 	SetActorEnableCollision(false);
 	// Restoring current rooms

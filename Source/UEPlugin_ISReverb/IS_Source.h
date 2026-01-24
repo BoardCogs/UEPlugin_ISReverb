@@ -148,7 +148,7 @@ public:
 
 
     // Returns true if two TArrays of room pointers have at least one room in common
-    static bool RoomsInCommon(TArray<ARoom*> a, TArray<ARoom*> b);
+    static bool RoomsInCommon(TArray<AIS_Room*> a, TArray<AIS_Room*> b);
     
 
 protected:

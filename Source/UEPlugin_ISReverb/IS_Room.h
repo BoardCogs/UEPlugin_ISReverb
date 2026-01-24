@@ -3,7 +3,7 @@
 #include "ReflectorSurface.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Room.generated.h"
+#include "IS_Room.generated.h"
 
 
 
@@ -12,14 +12,14 @@
  * Surfaces should approximate the room's shape and most prominent features.
  */
 UCLASS(Blueprintable)
-class UEPLUGIN_ISREVERB_API ARoom : public AActor
+class UEPLUGIN_ISREVERB_API AIS_Room : public AActor
 {
 	GENERATED_BODY()
 	
 public:
 	// CONSTRUCTOR
 	// Sets default values for this actor's properties
-	ARoom();
+	AIS_Room();
 
 protected:
 	// METHODS

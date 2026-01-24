@@ -2,7 +2,7 @@
 
 
 
-IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
+IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
     if (r == 0)
         return;
@@ -518,7 +518,7 @@ TArray<AReflectorSurface*> IS_Tree::Surfaces()
 {
     TArray<AReflectorSurface*> surfaces = TArray<AReflectorSurface*>();
     
-    for (ARoom* room : Rooms)
+    for (AIS_Room* room : Rooms)
     {
         if (room != nullptr)
         {
