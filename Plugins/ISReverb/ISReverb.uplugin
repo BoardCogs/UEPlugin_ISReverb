@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "ISReverb",
+	"Description": "Sound reverberation using Image Sources geometrical method",
+	"Category": "Other",
+	"CreatedBy": "Gianmaria Forte",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "ISReverb",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
