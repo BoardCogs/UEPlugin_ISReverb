@@ -12,7 +12,7 @@
  * Surfaces should approximate the room's shape and most prominent features.
  */
 UCLASS(Blueprintable)
-class UEPLUGIN_ISREVERB_API AIS_Room : public AActor
+class ISREVERB_API AIS_Room : public AActor
 {
 	GENERATED_BODY()
 	

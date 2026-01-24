@@ -12,7 +12,7 @@
  * A surface needs to be represented by a convex polygon, defined by its points and edges.
  */
 UCLASS(Blueprintable)
-class UEPLUGIN_ISREVERB_API AIS_ReflectorSurface : public AActor
+class ISREVERB_API AIS_ReflectorSurface : public AActor
 {
 	GENERATED_BODY()
 	

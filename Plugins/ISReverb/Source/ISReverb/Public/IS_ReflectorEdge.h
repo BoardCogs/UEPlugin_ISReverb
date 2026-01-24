@@ -7,7 +7,7 @@
 /**
  * Edge of a reflector, defined by its two extremes expressed in world coordinates.
  */
-class UEPLUGIN_ISREVERB_API IS_ReflectorEdge
+class ISREVERB_API IS_ReflectorEdge
 {
 public:
 	// PROPERTIES

@@ -1,12 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "IS_Tree.h"
-#include "IS_Listener.h"
-#include "IS_RoomTracker.h"
+#include "TmpIS_Tree.h"
+#include "TmpIS_Listener.h"
+#include "TmpIS_RoomTracker.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ObjectMacros.h"
-#include "IS_Source.generated.h"
+#include "TmpIS_Source.generated.h"
 
 
 
@@ -15,16 +15,16 @@
  * Responsible for generating ISs and simulating sound rays for reverberation.
  */
 UCLASS(Blueprintable)
-class UEPLUGIN_ISREVERB_API AIS_Source : public AIS_RoomTracker
+class UEPLUGIN_ISREVERB_API ATmpIS_Source : public ATmpIS_RoomTracker
 {
 	GENERATED_BODY()
 
 public:
-    AIS_Source();
+    ATmpIS_Source();
 
 private:
     // Image Sources trees, one for each listener
-    TMap<AIS_Listener*, IS_Tree> trees;
+    TMap<ATmpIS_Listener*, TmpIS_Tree> trees;
 
 public:
     /* The room(s) the source is currently in. */
@@ -119,20 +119,20 @@ private:
     UFUNCTION(BlueprintCallable)
     void GenerateISs();
 
-    void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
+    void GenerateISsLinear(ATmpIS_Listener* listener, FVector3f position);
 
-    void GenerateISsMT(AIS_Listener* listener, FVector3f position);
+    void GenerateISsMT(ATmpIS_Listener* listener, FVector3f position);
 
-    TFuture<IS_Tree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
+    TFuture<TmpIS_Tree> CreateISTreeTask(ATmpIS_Listener* listener, FVector3f position);
     
     // Generates paths for sound reflections, checking if the sound reaches the listener
     void GenerateAllReflectionPaths();
 
-    void GenerateRP(AIS_Listener* listener);
+    void GenerateRP(ATmpIS_Listener* listener);
 
-    void GenerateRPLinear(AIS_Listener* listener);
+    void GenerateRPLinear(ATmpIS_Listener* listener);
 
-    void GenerateRPMT(AIS_Listener* listener);
+    void GenerateRPMT(ATmpIS_Listener* listener);
 
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)
@@ -148,7 +148,7 @@ public:
 
 
     // Returns true if two TArrays of room pointers have at least one room in common
-    static bool RoomsInCommon(TArray<AIS_Room*> a, TArray<AIS_Room*> b);
+    static bool RoomsInCommon(TArray<ATmpIS_Room*> a, TArray<ATmpIS_Room*> b);
     
 
 protected:

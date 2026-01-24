@@ -11,7 +11,7 @@
  * An actor that tracks the room(s) it's currently in.
  */
 UCLASS(Abstract)
-class UEPLUGIN_ISREVERB_API AIS_RoomTracker : public AActor
+class ISREVERB_API AIS_RoomTracker : public AActor
 {
 	GENERATED_BODY()
 	
