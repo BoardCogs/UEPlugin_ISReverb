@@ -1,7 +1,7 @@
-#include "ReflectorEdge.h"
+#include "IS_ReflectorEdge.h"
 
 // Edge constructor
-ReflectorEdge::ReflectorEdge(FVector3f a, FVector3f b)
+IS_ReflectorEdge::IS_ReflectorEdge(FVector3f a, FVector3f b)
 {
 	PointA = a;
 	PointB = b;
@@ -10,13 +10,13 @@ ReflectorEdge::ReflectorEdge(FVector3f a, FVector3f b)
 
 
 // Returns unit vector expressing the direction followed by the edge from pointA to pointB
-FVector3f ReflectorEdge::Direction()
+FVector3f IS_ReflectorEdge::Direction()
 {
 	return (PointA - PointB).GetSafeNormal();
 }
 
 // Returns length of the edge in units
-float ReflectorEdge::Length()
+float IS_ReflectorEdge::Length()
 {
 	return (PointB - PointA).Length();
 }
@@ -24,25 +24,25 @@ float ReflectorEdge::Length()
 
 
 // Returns an empty edge
-ReflectorEdge ReflectorEdge::Void()
+IS_ReflectorEdge IS_ReflectorEdge::Void()
 {
-	return ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
+	return IS_ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
 }
 
 // Returns true if the edge has zero vectors for both extremes
-bool ReflectorEdge::IsVoid()
+bool IS_ReflectorEdge::IsVoid()
 {
 	return PointA == FVector3f::Zero() && PointB == FVector3f::Zero();
 }
 
 // Equal-to operator
-bool operator==(const ReflectorEdge& lhs, const ReflectorEdge& rhs)
+bool operator==(const IS_ReflectorEdge& lhs, const IS_ReflectorEdge& rhs)
 {
 	return lhs.PointA == rhs.PointA && lhs.PointB == rhs.PointB;
 }
 
 
 
-ReflectorEdge::~ReflectorEdge()
+IS_ReflectorEdge::~IS_ReflectorEdge()
 {
 }

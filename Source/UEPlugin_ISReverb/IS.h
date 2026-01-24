@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ISBeamProjection.h"
+#include "IS_BeamProjection.h"
 #include "ReflectorSurface.h"
 
 
@@ -13,7 +13,7 @@ class UEPLUGIN_ISREVERB_API IS
 {
 public:
 	// CONSTRUCTOR
-	IS(int i, int order, int parent, FVector3f pos, AReflectorSurface* surface, ISBeamProjection beam, bool valid = true);
+	IS(int i, int order, int parent, FVector3f pos, AReflectorSurface* surface, IS_BeamProjection beam, bool valid = true);
 
 	// PROPERTIES
 	// The index of this Image Source in its ISTree
@@ -32,7 +32,7 @@ public:
 	FVector3f Position = FVector3f::Zero();
 
 	// The points and edges resulting from beam tracing on this surface's reflector from its parent IS
-	ISBeamProjection BeamPoints = ISBeamProjection(TArray<FVector3f>(), TArray<ReflectorEdge>());
+	IS_BeamProjection BeamPoints = IS_BeamProjection(TArray<FVector3f>(), TArray<IS_ReflectorEdge>());
 
 	// If false, the IS should have been removed
 	bool Valid;

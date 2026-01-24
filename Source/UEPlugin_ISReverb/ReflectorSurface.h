@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReflectorEdge.h"
+#include "IS_ReflectorEdge.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ReflectorSurface.generated.h"
@@ -40,12 +40,12 @@ public:
 	
 	TArray<FVector3f> Points();
 	
-	TArray<ReflectorEdge> Edges();
+	TArray<IS_ReflectorEdge> Edges();
 	
 private:
 	// PROPERTIES
 	TArray<FVector3f> _points;
 	
-	TArray<ReflectorEdge> _edges;
+	TArray<IS_ReflectorEdge> _edges;
 	
 };

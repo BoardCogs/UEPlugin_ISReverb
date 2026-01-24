@@ -23,10 +23,10 @@ void AReflectorSurface::BeginPlay()
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(-50,-50,0)) ) );
 	_points.Add( FVector3f( GetTransform().TransformPosition(FVector3d(50,-50,0)) ) );
 
-	_edges.Add(ReflectorEdge(_points[0], _points[1]));
-	_edges.Add(ReflectorEdge(_points[1], _points[2]));
-	_edges.Add(ReflectorEdge(_points[2], _points[3]));
-	_edges.Add(ReflectorEdge(_points[3], _points[0]));
+	_edges.Add(IS_ReflectorEdge(_points[0], _points[1]));
+	_edges.Add(IS_ReflectorEdge(_points[1], _points[2]));
+	_edges.Add(IS_ReflectorEdge(_points[2], _points[3]));
+	_edges.Add(IS_ReflectorEdge(_points[3], _points[0]));
 
 	/* This code was moved in the Room class to be toggled for each room
 	TArray<UStaticMeshComponent*> Planes;
@@ -73,7 +73,7 @@ TArray<FVector3f> AReflectorSurface::Points()
 }
 
 // Returns all edges of the surface polygon
-TArray<ReflectorEdge> AReflectorSurface::Edges()
+TArray<IS_ReflectorEdge> AReflectorSurface::Edges()
 {
 	return _edges;
 }

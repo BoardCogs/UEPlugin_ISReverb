@@ -10,14 +10,14 @@
 /**
  * A tree containing all ISs generated for a source using a room's reflectors. 
  */
-class UEPLUGIN_ISREVERB_API ISTree
+class UEPLUGIN_ISREVERB_API IS_Tree
 {
 public:
 	// CONSTRUCTOR
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
+    IS_Tree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
 
 private:
 	// PROPERTIES
@@ -64,7 +64,7 @@ private:
     bool CreateIS(int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock);
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-    TArray<FVector3f> CreateProjectionPlanes(FVector3f position, ISBeamProjection BeamProjection);
+    TArray<FVector3f> CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection);
 
     // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points
     bool CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points);
@@ -81,5 +81,5 @@ public:
     // Returns true if a plane and segment intersect, point of intersection is in output in the variable intersection
     static bool LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon = 1e-6);
 	
-	~ISTree();
+	~IS_Tree();
 };

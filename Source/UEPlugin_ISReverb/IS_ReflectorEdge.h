@@ -7,7 +7,7 @@
 /**
  * Edge of a reflector, defined by its two extremes expressed in world coordinates.
  */
-class UEPLUGIN_ISREVERB_API ReflectorEdge
+class UEPLUGIN_ISREVERB_API IS_ReflectorEdge
 {
 public:
 	// PROPERTIES
@@ -16,7 +16,7 @@ public:
 
 	// CONSTRUCTOR
 	
-	ReflectorEdge(FVector3f a, FVector3f b);
+	IS_ReflectorEdge(FVector3f a, FVector3f b);
 
 	// METHODS
 
@@ -24,14 +24,14 @@ public:
 	
 	float Length();
 
-	static ReflectorEdge Void();
+	static IS_ReflectorEdge Void();
 
 	bool IsVoid();
 	
-	~ReflectorEdge();
+	~IS_ReflectorEdge();
 
 protected:
 	// METHODS
-	friend bool operator==(const ReflectorEdge& lhs, const ReflectorEdge& rhs);
+	friend bool operator==(const IS_ReflectorEdge& lhs, const IS_ReflectorEdge& rhs);
 	
 };

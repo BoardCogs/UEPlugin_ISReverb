@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ISTree.h"
+#include "IS_Tree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
 #include "Kismet/GameplayStatics.h"
@@ -24,7 +24,7 @@ public:
 
 private:
     // Image Sources trees, one for each listener
-    TMap<AIS_Listener*, ISTree> trees;
+    TMap<AIS_Listener*, IS_Tree> trees;
 
 public:
     /* The room(s) the source is currently in. */
@@ -123,7 +123,7 @@ private:
 
     void GenerateISsMT(AIS_Listener* listener, FVector3f position);
 
-    TFuture<ISTree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
+    TFuture<IS_Tree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
     
     // Generates paths for sound reflections, checking if the sound reaches the listener
     void GenerateAllReflectionPaths();

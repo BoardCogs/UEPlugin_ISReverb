@@ -1,6 +1,6 @@
-#include "ISBeamProjection.h"
+#include "IS_BeamProjection.h"
 
-ISBeamProjection::ISBeamProjection(TArray<FVector3f> points, TArray<ReflectorEdge> edges)
+IS_BeamProjection::IS_BeamProjection(TArray<FVector3f> points, TArray<IS_ReflectorEdge> edges)
 {
 	_points = TArray(points);
 	_edges = TArray(edges);
@@ -9,13 +9,13 @@ ISBeamProjection::ISBeamProjection(TArray<FVector3f> points, TArray<ReflectorEdg
 
 
 // Returns all points of the surface polygon
-TArray<FVector3f> ISBeamProjection::Points()
+TArray<FVector3f> IS_BeamProjection::Points()
 {
 	return _points;
 }
 
 // Returns all edges of the surface polygon
-TArray<ReflectorEdge> ISBeamProjection::Edges()
+TArray<IS_ReflectorEdge> IS_BeamProjection::Edges()
 {
 	return _edges;
 }
@@ -23,32 +23,32 @@ TArray<ReflectorEdge> ISBeamProjection::Edges()
 
 
 // Removes a point from the projection polygon
-void ISBeamProjection::RemovePoint(FVector3f point)
+void IS_BeamProjection::RemovePoint(FVector3f point)
 {
 	_points.Remove(point);
 }
 
 // Add a point to the projection polygon
-void ISBeamProjection::AddPoint(FVector3f point)
+void IS_BeamProjection::AddPoint(FVector3f point)
 {
 	if (!_points.Contains(point))
 		_points.Add(point);
 }
 
 // Removes an edge from the projection polygon
-void ISBeamProjection::RemoveEdge(ReflectorEdge edge)
+void IS_BeamProjection::RemoveEdge(IS_ReflectorEdge edge)
 {
 	_edges.Remove(edge);
 }
 
 // Add an edge to the projection polygon
-ReflectorEdge ISBeamProjection::AddEdge(FVector3f pointA, FVector3f pointB)
+IS_ReflectorEdge IS_BeamProjection::AddEdge(FVector3f pointA, FVector3f pointB)
 {
-	ReflectorEdge edge = ReflectorEdge(pointA, pointB);
+	IS_ReflectorEdge edge = IS_ReflectorEdge(pointA, pointB);
 
 	if (_edges.Contains(edge) || pointA == pointB)
 	{
-		return ReflectorEdge::Void();
+		return IS_ReflectorEdge::Void();
 	}
 
 	_edges.Add( edge );
@@ -59,9 +59,9 @@ ReflectorEdge ISBeamProjection::AddEdge(FVector3f pointA, FVector3f pointB)
 
 
 // Given a and b, two points connected by an edge, finds the other edge that a belongs to
-ReflectorEdge ISBeamProjection::FindOtherEdge(FVector3f a, FVector3f b)
+IS_ReflectorEdge IS_BeamProjection::FindOtherEdge(FVector3f a, FVector3f b)
 {
-	for (ReflectorEdge edge : _edges)
+	for (IS_ReflectorEdge edge : _edges)
 	{
 		// If one extreme of the edge is a and the other is not b, then return the other edge
 		if ( ( edge.PointA == a || edge.PointB == a ) && edge.PointB != b && edge.PointA != b )
@@ -70,11 +70,11 @@ ReflectorEdge ISBeamProjection::FindOtherEdge(FVector3f a, FVector3f b)
 		}
 	}
 
-	return ReflectorEdge::Void();
+	return IS_ReflectorEdge::Void();
 }
 
 
 
-ISBeamProjection::~ISBeamProjection()
+IS_BeamProjection::~IS_BeamProjection()
 {
 }

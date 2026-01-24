@@ -1,8 +1,8 @@
-#include "ISTree.h"
+#include "IS_Tree.h"
 
 
 
-ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
+IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
 {
     if (r == 0)
         return;
@@ -26,7 +26,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
         FVector3f pos = sourcePos;
         pos -= 2 * FVector3f::DotProduct(_surfaces[i]->Normal(),pos - _surfaces[i]->Origin()) * _surfaces[i]->Normal();
 
-        _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], ISBeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
+        _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], IS_BeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
     }
 
     FCriticalSection iLock;
@@ -88,7 +88,7 @@ ISTree::ISTree(int r, FVector3f sourcePos, TArray<ARoom*> rooms, bool wrongSideO
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
+bool IS_Tree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
 {
     nodesLock.Lock();
     IS* parentNode = &_nodes[parent];
@@ -128,7 +128,7 @@ bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<
     // 3
     // Checking that reflections from parent to this surface are possible with beam tracing (+ clipping)
 
-    ISBeamProjection beam = ISBeamProjection( surface->Points() , surface->Edges() );
+    IS_BeamProjection beam = IS_BeamProjection( surface->Points() , surface->Edges() );
 
     if (_beamTracing)
     {
@@ -139,13 +139,13 @@ bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<
         // Edge extreme that falls outside projection
         FVector3f outPoint;
         // The other edge connected to the outPoint
-        ReflectorEdge otherEdge = ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
+        IS_ReflectorEdge otherEdge = IS_ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
         // Edge extreme of the other edge
         FVector3f otherPoint;
         // Intersection with the other edge
         FVector3f secondIntersection;
         // List of edges that don't need an intersection to be tested (to avoid repeated intersection detection on edge extremes)
-        TArray<ReflectorEdge> blackList = TArray<ReflectorEdge>();
+        TArray<IS_ReflectorEdge> blackList = TArray<IS_ReflectorEdge>();
         int e = 0;
 
         
@@ -157,7 +157,7 @@ bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<
 
             while (e < beam.Edges().Num())
             {
-                ReflectorEdge edge = beam.Edges()[e];
+                IS_ReflectorEdge edge = beam.Edges()[e];
 
                 // Checks if the edge intersects the plane
                 if ( !blackList.Contains(edge) && LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentNode->Position ) )
@@ -420,7 +420,7 @@ bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<
     if (_beamClipping)
         _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, beam ) );
     else
-        _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, ISBeamProjection( surface->Points() , surface->Edges() ) ) );
+        _nodes.Add( IS(_nodes.Num(), order, parent, pos, surface, IS_BeamProjection( surface->Points() , surface->Edges() ) ) );
 
     nodesLock.Unlock();
 
@@ -434,10 +434,10 @@ bool ISTree::CreateIS(int order, int parent, AReflectorSurface* surface, TArray<
 
 
 // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-TArray<FVector3f> ISTree::CreateProjectionPlanes(FVector3f position, ISBeamProjection BeamProjection)
+TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection)
 {
     TArray<FVector3f> normals = TArray<FVector3f>();
-    for (ReflectorEdge e : BeamProjection.Edges())
+    for (IS_ReflectorEdge e : BeamProjection.Edges())
     {
         FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position);
 
@@ -452,7 +452,7 @@ TArray<FVector3f> ISTree::CreateProjectionPlanes(FVector3f position, ISBeamProje
 
 
 // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points except those on the edge
-bool ISTree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points)
+bool IS_Tree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points)
 {
     for(FVector3f point : points)
     {
@@ -467,7 +467,7 @@ bool ISTree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, T
 
 
 // Returns true if a plane and segment intersect, point of intersection is in output in the variable intersection
-bool ISTree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon)
+bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon)
 {
     *intersection = FVector3f::Zero();
 
@@ -499,7 +499,7 @@ bool ISTree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint,
 
 
 // For public access
-TArray<IS*> ISTree::Nodes()
+TArray<IS*> IS_Tree::Nodes()
 {
     TArray<IS*> nodes;
 
@@ -514,7 +514,7 @@ TArray<IS*> ISTree::Nodes()
 
 
 // All reflectors in the scene
-TArray<AReflectorSurface*> ISTree::Surfaces()
+TArray<AReflectorSurface*> IS_Tree::Surfaces()
 {
     TArray<AReflectorSurface*> surfaces = TArray<AReflectorSurface*>();
     
@@ -531,6 +531,6 @@ TArray<AReflectorSurface*> ISTree::Surfaces()
 
 
 
-ISTree::~ISTree()
+IS_Tree::~IS_Tree()
 {
 }

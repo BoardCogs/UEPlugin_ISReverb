@@ -64,7 +64,7 @@ void AIS_Source::GenerateISs()
 void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 {
 	// Generates ISTree and adds it to the array
-	ISTree tree = ISTree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
+	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
 	trees.Add(listener, tree);
 
 	// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
@@ -90,7 +90,7 @@ void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async IS generation"));
 
 	CreateISTreeTask(listener, position)
-		.Next([this, listener](const ISTree& tree)
+		.Next([this, listener](const IS_Tree& tree)
 		{
 			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, tree]()
 			{
@@ -107,14 +107,14 @@ void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 
 
 
-TFuture<ISTree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f position)
+TFuture<IS_Tree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f position)
 {
-	TSharedRef<TPromise<ISTree>> Promise = MakeShared<TPromise<ISTree>>();
-	TFuture<ISTree> Future = Promise->GetFuture();
+	TSharedRef<TPromise<IS_Tree>> Promise = MakeShared<TPromise<IS_Tree>>();
+	TFuture<IS_Tree> Future = Promise->GetFuture();
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, position, Promise]() mutable
 	{
-		ISTree tree = ISTree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
+		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
 		Promise->SetValue(tree);
 	});
 
@@ -128,7 +128,7 @@ void AIS_Source::GenerateAllReflectionPaths()
     if (trees.IsEmpty())
         return;
     
-	for (TPair<AIS_Listener*, ISTree>& pair : trees)
+	for (TPair<AIS_Listener*, IS_Tree>& pair : trees)
 	{
 		GenerateRP(pair.Key);
 	}
@@ -613,7 +613,7 @@ void AIS_Source::DrawDebug()
 				DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
 
 				// Draws the resulting beam projection on the reflector
-				for (ReflectorEdge edge : node->BeamPoints.Edges())
+				for (IS_ReflectorEdge edge : node->BeamPoints.Edges())
 				{
 					DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Red, true, -1, 0, 2);
 				}
@@ -629,7 +629,7 @@ void AIS_Source::DrawDebug()
 				DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
 
 				// Draws parent beam points
-				for (ReflectorEdge edge : nodeParent->BeamPoints.Edges())
+				for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
 				{
 					DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Blue, true, -1, 0, 2);
 				}
@@ -664,7 +664,7 @@ void AIS_Source::DrawDebug()
 				// Draws projection of beam points and beam edges upon the reflector plane
 				if (drawPlaneProjection)
 				{
-					for (ReflectorEdge edge : nodeParent->BeamPoints.Edges())
+					for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
 					{
 						int indexA = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointA);
 						int indexB = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointB);
