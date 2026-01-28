@@ -10,6 +10,7 @@ public class ISReverb : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
+				"ISReverb/Public"
 				// ... add public include paths required here ...
 			}
 			);
@@ -17,6 +18,7 @@ public class ISReverb : ModuleRules
 		
 		PrivateIncludePaths.AddRange(
 			new string[] {
+				"ISReverb/Private",
 				// ... add other private include paths required here ...
 			}
 			);
@@ -26,6 +28,8 @@ public class ISReverb : ModuleRules
 			new string[]
 			{
 				"Core",
+				"RenderCore",
+				"RHI",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -36,8 +40,6 @@ public class ISReverb : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
-				"Slate",
-				"SlateCore",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
