@@ -25,20 +25,20 @@ If not already installed, the launcher should automatically download the correct
 
 Upon opening the Unreal project, you will find the default level already loaded, complete with a shoebox room to showcase the plugin.
 
-After running the level, in the *World Outliner* panel, under *Sources*, click on the *TestSource* actor.
-The *Details* panel will show all actor properties: in the properties derived from the *Source* class, different fields allow to personalize and launch Image Sources generation, as well as debug and view all sound rays and Image Sources. Just hover on a field to see its tooltip.
+After running the level, in the *Outliner* panel, inside the *ISTest* folder, select on the *TestSource* actor.
+The *Details* panel will show you all actor properties: among the ones derived from the *IS_Source* class, different fields allow to personalize and launch Image Sources generation, as well as debug and view all sound rays and Image Sources. Just hover on a field to see its tooltip.
 
-In the the level, press F8 to freely move the camera around without moving the character. While holding the right mouse button, use the WASD buttons to move and move your mouse to look around.
+In the level, while playing, press F8 to unlock the camera from the character. While holding the right mouse button, use the WASD buttons to freely move the camera and move your mouse to look around.
 
 ### Experimenting with the layout
 
-Freely move the *TestSource* and *TestListener* actors, then launch IS generation to try different configurations, or change the position and orientation of the room's surfaces (surfaces already are and always should be children of the *TestRoom* actor, more can be added if needed) to create more complex rooms.
+Feel free to change the positions of the *TestSource* and *TestListener* actors, while keeping them inside the *TestRoom*'s collision box, then launch IS generation to try different configurations; or change the position and orientation of the room's surfaces (surfaces already are and always should be children of the *TestRoom* actor, more can be added if needed) to create more complex rooms.
 Be careful to extend the room's collision box (a component of the *TestRoom* actor) so that it always covers the entire volume of the room.
 
 ### Comparing results
 
 Refer to the *Output Log* panel to see a full review of the final results of each of the two phases of the algorithm and for benchmarking.
-To the bottom of the log, a full report is written after the algorithm finishes, containing the number of generated ISs, the ISs cut by optimizations, the number of valid sound rays detected and, last but not least, the execution time required by the two phases of the algorithm.
+To the bottom of the log, a full report is written every time the algorithm finishes, containing the number of generated ISs, the ISs cut by optimizations, the number of valid sound rays detected and, last but not least, the execution time required by the two phases of the algorithm.
 
 ## Authors
 
