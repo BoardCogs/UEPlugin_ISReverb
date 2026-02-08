@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+using System.IO;
 using UnrealBuildTool;
 
 public class ISReverb : ModuleRules
@@ -19,6 +20,7 @@ public class ISReverb : ModuleRules
 		PrivateIncludePaths.AddRange(
 			new string[] {
 				"ISReverb/Private",
+				Path.Combine(GetModuleDirectory("Renderer"), "Internal"),
 				// ... add other private include paths required here ...
 			}
 			);
@@ -29,6 +31,7 @@ public class ISReverb : ModuleRules
 			{
 				"Core",
 				"RenderCore",
+				"Renderer",
 				"RHI",
 				// ... add other public dependencies that you statically link with here ...
 			}
@@ -40,6 +43,7 @@ public class ISReverb : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
+				"Projects",
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
