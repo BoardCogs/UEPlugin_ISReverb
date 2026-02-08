@@ -25,7 +25,7 @@ If not already installed, the launcher should automatically download the correct
 
 Upon opening the Unreal project, you will find the default level already loaded, complete with a shoebox room to showcase the plugin.
 
-After running the level, in the *Outliner* panel, inside the *ISTest* folder, select on the *TestSource* actor.
+After running the level, in the *Outliner* panel, inside the *ISTest* folder, select the *TestSource* actor.
 The *Details* panel will show you all actor properties: among the ones derived from the *IS_Source* class, different fields allow to personalize and launch Image Sources generation, as well as debug and view all sound rays and Image Sources. Just hover on a field to see its tooltip.
 
 In the level, while playing, press F8 to unlock the camera from the character. While holding the right mouse button, use the WASD buttons to freely move the camera and move your mouse to look around.
