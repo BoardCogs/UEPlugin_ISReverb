@@ -153,9 +153,6 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 		TextureCreated = true;
 	}
 
-	//CachedParams.Scene->RayTracingScene.Create(GraphBuilder, );
-	FRayTracingShaderBindingTable* RayTracingSBT = CachedParams.SBT;
-
 	// set shader parameters
 	FRayGenTestRGS::FParameters *PassParameters = GraphBuilder->AllocParameters<FRayGenTestRGS::FParameters>();
 	PassParameters->ViewUniformBuffer = Parameters.View->ViewUniformBuffer;
@@ -163,6 +160,10 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	PassParameters->outTex = ShaderOutputTextureUAV;
 
 	// define render pass needed parameters
+	//CachedParams.Scene->RayTracingScene.Create(GraphBuilder, );
+	//GetWorld()->Scene->UpdateCachedRayTracingState();
+	//CachedParams.Scene->UpdateCachedRayTracingState();
+	FRayTracingShaderBindingTable* RayTracingSBT = CachedParams.SBT;
 	TShaderMapRef<FRayGenTestRGS> RayGenTestRGS(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	FIntPoint TextureSize = { CachedParams.RenderTarget->SizeX, CachedParams.RenderTarget->SizeY };
 	FRHIRayTracingScene* RHIScene = CachedParams.Scene->RayTracingScene.GetRHIRayTracingScene(ERayTracingSceneLayer::Base);

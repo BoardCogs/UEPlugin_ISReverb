@@ -19,12 +19,6 @@ void ATestRunner::BeginPlay()
 void ATestRunner::UpdateTestParameters()
 {
 	FRayGenTestParameters parameters;
-	
-	//GetWorld()->Scene->UpdateCachedRayTracingState();
-	//GetWorld()->Scene->GetRenderScene()->RayTracingSBT;
-	//GetWorld()->Scene->GetRenderScene()->RayTracingScene;
-
-	//parameters.Scene = &GetWorld()->Scene->GetRenderScene()->RayTracingScene;
 	parameters.Scene = GetWorld()->Scene->GetRenderScene();
 	parameters.SBT = &GetWorld()->Scene->GetRenderScene()->RayTracingSBT;
 	parameters.CachedRenderTargetSize = FIntPoint(RenderTarget->SizeX, RenderTarget->SizeY);
