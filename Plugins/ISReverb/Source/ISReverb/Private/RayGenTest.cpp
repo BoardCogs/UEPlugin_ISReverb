@@ -154,6 +154,7 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	}
 
 	//CachedParams.Scene->RayTracingScene.Create(GraphBuilder, );
+	FRayTracingShaderBindingTable* RayTracingSBT = CachedParams.SBT;
 
 	// set shader parameters
 	FRayGenTestRGS::FParameters *PassParameters = GraphBuilder->AllocParameters<FRayGenTestRGS::FParameters>();
@@ -171,7 +172,7 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 		RDG_EVENT_NAME("RayGenTest"),
 		PassParameters,
 		ERDGPassFlags::Compute,
-		[PassParameters, layerView, RayGenTestRGS, TextureSize, RHIScene](FRHICommandList& RHICmdList)
+		[PassParameters, RayTracingSBT, layerView, RayGenTestRGS, TextureSize, RHIScene](FRHICommandList& RHICmdList)
 		{
 			PassParameters->TLAS = layerView->GetRHI();
 			
@@ -199,17 +200,12 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 
 			// dispatch ray trace shader
 			FRayTracingPipelineState* PipeLine = PipelineStateCache::GetAndOrCreateRayTracingPipelineState(RHICmdList, PSOInitializer);
-
-			// Roba nuova start
-
-			FRayTracingShaderBindingTable RayTracingSBT = FRayTracingShaderBindingTable();
-			FRHIShaderBindingTable* SBT = RayTracingSBT.AllocateTransientRHI(RHICmdList, ERayTracingShaderBindingMode::RTPSO, ERayTracingHitGroupIndexingMode::Allow, PSOInitializer.GetMaxLocalBindingDataSize());
+			
+			FRHIShaderBindingTable* SBT = RayTracingSBT->AllocateTransientRHI(RHICmdList, ERayTracingShaderBindingMode::RTPSO, ERayTracingHitGroupIndexingMode::Allow, PSOInitializer.GetMaxLocalBindingDataSize());
 
 			RHICmdList.SetRayTracingMissShader(SBT, 0, PipeLine, 0 /* ShaderIndexInPipeline */, 0, nullptr, 0);
 			RHICmdList.CommitShaderBindingTable(SBT);
 			RHICmdList.RayTraceDispatch( PipeLine, GetGlobalShaderMap(GMaxRHIFeatureLevel)->GetShader<FRayGenTestRGS>().GetRayTracingShader(), SBT, GlobalResources, TextureSize.X,TextureSize.Y );
-			
-			// Roba nuova end
 		}
 	);
 
