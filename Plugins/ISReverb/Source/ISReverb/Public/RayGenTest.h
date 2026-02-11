@@ -35,7 +35,8 @@ struct FRayGenTestParameters
 	}
 
 	UTextureRenderTarget2D* RenderTarget;
-	FRayTracingScene* Scene;
+	//FRayTracingScene* Scene;
+	FScene* Scene;
 	FIntPoint CachedRenderTargetSize;
 };
 

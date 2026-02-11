@@ -1,5 +1,7 @@
 #include "RayGenTest.h"
 
+#include "Runtime/Renderer/Private/ScenePrivate.h"
+
 #define NUM_THREADS_PER_GROUP_DIMENSION 8
 
 class FRayGenTestRGS : public FGlobalShader
@@ -151,23 +153,25 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 		TextureCreated = true;
 	}
 
+	//CachedParams.Scene->RayTracingScene.Create(GraphBuilder, );
+
 	// set shader parameters
 	FRayGenTestRGS::FParameters *PassParameters = GraphBuilder->AllocParameters<FRayGenTestRGS::FParameters>();
 	PassParameters->ViewUniformBuffer = Parameters.View->ViewUniformBuffer;
-	FRDGBufferSRVRef layerView = CachedParams.Scene->GetLayerView(ERayTracingSceneLayer::Base);
+	FRDGBufferSRVRef layerView = CachedParams.Scene->RayTracingScene.GetLayerView(ERayTracingSceneLayer::Base);
 	PassParameters->outTex = ShaderOutputTextureUAV;
 
 	// define render pass needed parameters
 	TShaderMapRef<FRayGenTestRGS> RayGenTestRGS(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	FIntPoint TextureSize = { CachedParams.RenderTarget->SizeX, CachedParams.RenderTarget->SizeY };
-	FRHIRayTracingScene* RHIScene = CachedParams.Scene->GetRHIRayTracingScene(ERayTracingSceneLayer::Base);
+	FRHIRayTracingScene* RHIScene = CachedParams.Scene->RayTracingScene.GetRHIRayTracingScene(ERayTracingSceneLayer::Base);
 
 	// add the ray trace dispatch pass
 	GraphBuilder->AddPass(
 		RDG_EVENT_NAME("RayGenTest"),
 		PassParameters,
 		ERDGPassFlags::Compute,
-		[PassParameters, layerView, RayGenTestRGS, TextureSize, RHIScene](FRHIRayTracingCommandList& RHICmdList)
+		[PassParameters, layerView, RayGenTestRGS, TextureSize, RHIScene](FRHICommandList& RHICmdList)
 		{
 			PassParameters->TLAS = layerView->GetRHI();
 			
@@ -195,14 +199,23 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 
 			// dispatch ray trace shader
 			FRayTracingPipelineState* PipeLine = PipelineStateCache::GetAndOrCreateRayTracingPipelineState(RHICmdList, PSOInitializer);
-			RHICmdList.SetRayTracingMissShader(RHIScene, 0, PipeLine, 0 /* ShaderIndexInPipeline */, 0, nullptr, 0);
-			RHICmdList.RayTraceDispatch(PipeLine, RayGenTestRGS.GetRayTracingShader(), RHIScene, GlobalResources, TextureSize.X, TextureSize.Y);
+
+			// Roba nuova start
+
+			FRayTracingShaderBindingTable RayTracingSBT = FRayTracingShaderBindingTable();
+			FRHIShaderBindingTable* SBT = RayTracingSBT.AllocateTransientRHI(RHICmdList, ERayTracingShaderBindingMode::RTPSO, ERayTracingHitGroupIndexingMode::Allow, PSOInitializer.GetMaxLocalBindingDataSize());
+
+			RHICmdList.SetRayTracingMissShader(SBT, 0, PipeLine, 0 /* ShaderIndexInPipeline */, 0, nullptr, 0);
+			RHICmdList.CommitShaderBindingTable(SBT);
+			RHICmdList.RayTraceDispatch( PipeLine, GetGlobalShaderMap(GMaxRHIFeatureLevel)->GetShader<FRayGenTestRGS>().GetRayTracingShader(), SBT, GlobalResources, TextureSize.X,TextureSize.Y );
+			
+			// Roba nuova end
 		}
 	);
 
 	// Copy textures from the shader output to our render target
 	// this is done as a render pass with the graph builder
-	FTextureRHIRef OriginalRT = CachedParams.RenderTarget->GetRenderTargetResource()->GetTexture2DRHI();
+	FTextureRHIRef OriginalRT = CachedParams.RenderTarget->GetRenderTargetResource()->GetTextureRHI();
 	FRDGTexture* OutputRDGTexture = GraphBuilder->RegisterExternalTexture(CreateRenderTarget(ShaderOutputTexture, TEXT("RaytracingTestOutputRT")));
 	FRDGTexture* CopyToRDGTexture = GraphBuilder->RegisterExternalTexture(CreateRenderTarget(OriginalRT, TEXT("RaytracingTestCopyToRT")));
 	FRHICopyTextureInfo CopyInfo;
