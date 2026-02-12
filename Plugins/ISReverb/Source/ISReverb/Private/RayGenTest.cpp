@@ -127,8 +127,15 @@ void FRayGenTest::UpdateParameters(FRayGenTestParameters& DrawParameters)
 void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 #if RHI_RAYTRACING
 {
+	FScene* Scene = Parameters.View->Family->Scene->GetRenderScene();
+	FRayTracingScene* RayTracingScene = &Scene->RayTracingScene;
+	
 	FRDGBuilder* GraphBuilder = Parameters.GraphBuilder;
+
+	//RayTracingScene->Create(*GraphBuilder, *Parameters.View, &Parameters.View->Family->Scene->GetRenderScene()->GPUScene, ERDGPassFlags::Compute);
+
 	FRHICommandListImmediate& RHICmdList = GraphBuilder->RHICmdList;
+	
 	//If there's no cached parameters to use, skip
 	//If no Render Target is supplied in the cachedParams, skip
 	if (!(bCachedParamsAreValid && CachedParams.RenderTarget))
@@ -156,17 +163,17 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	// set shader parameters
 	FRayGenTestRGS::FParameters *PassParameters = GraphBuilder->AllocParameters<FRayGenTestRGS::FParameters>();
 	PassParameters->ViewUniformBuffer = Parameters.View->ViewUniformBuffer;
-	FRDGBufferSRVRef layerView = CachedParams.Scene->RayTracingScene.GetLayerView(ERayTracingSceneLayer::Base);
+	FRDGBufferSRVRef layerView = RayTracingScene->GetLayerView(ERayTracingSceneLayer::Base);
 	PassParameters->outTex = ShaderOutputTextureUAV;
 
 	// define render pass needed parameters
 	//CachedParams.Scene->RayTracingScene.Create(GraphBuilder, );
 	//GetWorld()->Scene->UpdateCachedRayTracingState();
 	//CachedParams.Scene->UpdateCachedRayTracingState();
-	FRayTracingShaderBindingTable* RayTracingSBT = CachedParams.SBT;
+	FRayTracingShaderBindingTable* RayTracingSBT = &Scene->RayTracingSBT;
 	TShaderMapRef<FRayGenTestRGS> RayGenTestRGS(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	FIntPoint TextureSize = { CachedParams.RenderTarget->SizeX, CachedParams.RenderTarget->SizeY };
-	FRHIRayTracingScene* RHIScene = CachedParams.Scene->RayTracingScene.GetRHIRayTracingScene(ERayTracingSceneLayer::Base);
+	FRHIRayTracingScene* RHIScene = RayTracingScene->GetRHIRayTracingScene(ERayTracingSceneLayer::Base);
 
 	// add the ray trace dispatch pass
 	GraphBuilder->AddPass(
@@ -218,6 +225,8 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	FRHICopyTextureInfo CopyInfo;
 	CopyInfo.Size = FIntVector(TextureSize.X, TextureSize.Y, 0);
 	AddCopyTexturePass(*GraphBuilder, OutputRDGTexture, CopyToRDGTexture, CopyInfo);
+
+	EndRendering();
 }
 #else // !RHI_RAYTRACING
 {
