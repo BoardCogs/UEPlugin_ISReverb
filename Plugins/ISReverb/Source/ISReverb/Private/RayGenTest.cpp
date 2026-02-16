@@ -77,6 +77,8 @@ IMPLEMENT_GLOBAL_SHADER(FRayGenTestMS, "/Plugin/ISReverb/ISReverbShader.usf", "R
 
 FRayGenTest::FRayGenTest()
 {
+	bCachedParamsAreValid = false;
+	TextureCreated = false;
 }
 
 void FRayGenTest::BeginRendering()
@@ -132,8 +134,6 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	
 	FRDGBuilder* GraphBuilder = Parameters.GraphBuilder;
 
-	//RayTracingScene->Create(*GraphBuilder, *Parameters.View, &Parameters.View->Family->Scene->GetRenderScene()->GPUScene, ERDGPassFlags::Compute);
-
 	FRHICommandListImmediate& RHICmdList = GraphBuilder->RHICmdList;
 	
 	//If there's no cached parameters to use, skip
@@ -167,9 +167,6 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	PassParameters->outTex = ShaderOutputTextureUAV;
 
 	// define render pass needed parameters
-	//CachedParams.Scene->RayTracingScene.Create(GraphBuilder, );
-	//GetWorld()->Scene->UpdateCachedRayTracingState();
-	//CachedParams.Scene->UpdateCachedRayTracingState();
 	FRayTracingShaderBindingTable* RayTracingSBT = &Scene->RayTracingSBT;
 	TShaderMapRef<FRayGenTestRGS> RayGenTestRGS(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	FIntPoint TextureSize = { CachedParams.RenderTarget->SizeX, CachedParams.RenderTarget->SizeY };
