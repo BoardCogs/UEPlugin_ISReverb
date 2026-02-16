@@ -141,7 +141,7 @@ void AIS_Source::GenerateRP(AIS_Listener* listener)
 	//GenerateRPLinear(listener, tree);
 	
 	/*
-	if (EnableRayTracing)
+	if (EnableRayTracing && IsRayTracingEnabled())
 	{
 		//GenerateRPRT(listener, tree);
 	}
