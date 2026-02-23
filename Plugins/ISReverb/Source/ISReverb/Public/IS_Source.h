@@ -4,6 +4,7 @@
 #include "IS_Tree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
+#include "RayGenTest.h"
 #include "RenderUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ObjectMacros.h"
@@ -27,6 +28,9 @@ private:
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, IS_Tree> trees;
 
+    // Wrapper class for the raytracing shader
+    FRayGenTest Test;
+
 public:
     /* The room(s) the source is currently in. */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -36,9 +40,16 @@ public:
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    UTextureRenderTarget2D* RenderTarget = nullptr;
+
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended). */
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
+
+    /* Set to true to enable using raytracing to generate reflection paths (recommended). */
+    UPROPERTY(EditAnywhere)
+    bool EnableRayTracing;
 
     /* Set to true to activate IS generation (only in play mode) */
     UPROPERTY(EditAnywhere)
@@ -113,6 +124,9 @@ protected:
     // Called upon changes made in the editor.
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
+    // Called to update parameters for raytracing
+    void UpdateTestParameters();
+
 
     
 private:
@@ -134,6 +148,8 @@ private:
     void GenerateRPLinear(AIS_Listener* listener);
 
     void GenerateRPMT(AIS_Listener* listener);
+
+    void GenerateRPRT(AIS_Listener* listener);
 
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)
