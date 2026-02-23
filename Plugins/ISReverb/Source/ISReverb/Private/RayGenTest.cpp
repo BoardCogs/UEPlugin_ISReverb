@@ -185,7 +185,7 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 			SetShaderParameters(GlobalResources, RayGenTestRGS, *PassParameters);
 
 			FRayTracingPipelineStateInitializer PSOInitializer;
-			PSOInitializer.MaxPayloadSizeInBytes = GetRayTracingPayloadTypeMaxSize(FRayGenTestRGS::GetRayTracingPayloadType(0));;
+			PSOInitializer.MaxPayloadSizeInBytes = GetRayTracingPayloadTypeMaxSize(FRayGenTestRGS::GetRayTracingPayloadType(0));
 			PSOInitializer.bAllowHitGroupIndexing = false;
 
 			// Set RayGen shader
