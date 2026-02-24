@@ -50,8 +50,15 @@ void RayTraceTestMS(inout FMinimalPayload data)
     data.SetMiss();
 }
 
+[shader("anyhit")]
+void RayTraceTestAHS(inout FMinimalPayload data, BuiltInTriangleIntersectionAttributes attribs)
+{
+    data.HitT = 1.0f;
+}
+
+
 [shader("closesthit")]
 void RayTraceTestCHS(inout FMinimalPayload data, BuiltInTriangleIntersectionAttributes attribs)
 {
-    data.HitT = 1.0f;
+    //data.HitT = 1.0f;
 }

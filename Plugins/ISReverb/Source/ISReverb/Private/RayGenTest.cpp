@@ -54,14 +54,33 @@ class FRayGenTestCHS : public FGlobalShader
 
 	using FParameters = FEmptyShaderParameters;
 };
-IMPLEMENT_GLOBAL_SHADER(FRayGenTestCHS, "/Plugin/ISReverb/ISReverbShader.usf", "closestHit=RayTraceTestCHS", SF_RayHitGroup);
+IMPLEMENT_GLOBAL_SHADER(FRayGenTestCHS, "/Plugin/ISReverb/ISReverbShader.usf", "RayTraceTestCHS", SF_RayHitGroup);
+
+class FRayGenTestAHS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FRayGenTestAHS)
+	SHADER_USE_ROOT_PARAMETER_STRUCT(FRayGenTestAHS, FGlobalShader)
+
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return FRayGenTestRGS::GetRayTracingPayloadType(PermutationId);
+	}
+
+	using FParameters = FEmptyShaderParameters;
+};
+IMPLEMENT_GLOBAL_SHADER(FRayGenTestAHS, "/Plugin/ISReverb/ISReverbShader.usf", "closestHit=RayTraceTestCHS anyHit=RayTraceTestAHS", SF_RayHitGroup);
 
 class FRayGenTestMS : public FGlobalShader
 {
 	DECLARE_GLOBAL_SHADER(FRayGenTestMS)
 	SHADER_USE_ROOT_PARAMETER_STRUCT(FRayGenTestMS, FGlobalShader)
 
-		static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
 	{
 		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
 	}
@@ -170,14 +189,13 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	FRayTracingShaderBindingTable* RayTracingSBT = &Scene->RayTracingSBT;
 	TShaderMapRef<FRayGenTestRGS> RayGenTestRGS(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	FIntPoint TextureSize = { CachedParams.RenderTarget->SizeX, CachedParams.RenderTarget->SizeY };
-	FRHIRayTracingScene* RHIScene = RayTracingScene->GetRHIRayTracingScene(ERayTracingSceneLayer::Base);
 
 	// add the ray trace dispatch pass
 	GraphBuilder->AddPass(
 		RDG_EVENT_NAME("RayGenTest"),
 		PassParameters,
 		ERDGPassFlags::Compute,
-		[PassParameters, RayTracingSBT, layerView, RayGenTestRGS, TextureSize, RHIScene](FRHICommandList& RHICmdList)
+		[PassParameters, RayTracingSBT, layerView, RayGenTestRGS, TextureSize](FRHICommandList& RHICmdList)
 		{
 			PassParameters->TLAS = layerView->GetRHI();
 			
@@ -195,7 +213,7 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 
 			// Set ClosestHit shader
 			TArray<FRHIRayTracingShader*> RayHitShaderTable;
-			RayHitShaderTable.Add(GetGlobalShaderMap(GMaxRHIFeatureLevel)->GetShader<FRayGenTestCHS>().GetRayTracingShader());
+			RayHitShaderTable.Add(GetGlobalShaderMap(GMaxRHIFeatureLevel)->GetShader<FRayGenTestAHS>().GetRayTracingShader());
 			PSOInitializer.SetHitGroupTable(RayHitShaderTable);
 			
 			// Set Miss shader
