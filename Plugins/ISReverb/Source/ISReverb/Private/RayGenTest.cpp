@@ -13,6 +13,8 @@ class FRayGenTestRGS : public FGlobalShader
 		SHADER_PARAMETER_UAV(RWTexture2D<float4>, outTex)
 		SHADER_PARAMETER_SRV(RaytracingAccelerationStructure, TLAS)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, ViewUniformBuffer)
+		SHADER_PARAMETER_STRUCT_REF(FPrimitiveUniformShaderParameters, PrimitiveUniformBuffer)
+		//SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneUniformParameters, Scene)
 	END_SHADER_PARAMETER_STRUCT()
 
 	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
@@ -37,25 +39,6 @@ class FRayGenTestRGS : public FGlobalShader
 };
 IMPLEMENT_GLOBAL_SHADER(FRayGenTestRGS, "/Plugin/ISReverb/ISReverbShader.usf", "RayTraceTestRGS", SF_RayGen);
 
-class FRayGenTestCHS : public FGlobalShader
-{
-	DECLARE_GLOBAL_SHADER(FRayGenTestCHS)
-	SHADER_USE_ROOT_PARAMETER_STRUCT(FRayGenTestCHS, FGlobalShader)
-
-	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
-	{
-		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
-	}
-
-	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
-	{
-		return FRayGenTestRGS::GetRayTracingPayloadType(PermutationId);
-	}
-
-	using FParameters = FEmptyShaderParameters;
-};
-IMPLEMENT_GLOBAL_SHADER(FRayGenTestCHS, "/Plugin/ISReverb/ISReverbShader.usf", "RayTraceTestCHS", SF_RayHitGroup);
-
 class FRayGenTestAHS : public FGlobalShader
 {
 	DECLARE_GLOBAL_SHADER(FRayGenTestAHS)
@@ -73,7 +56,26 @@ class FRayGenTestAHS : public FGlobalShader
 
 	using FParameters = FEmptyShaderParameters;
 };
-IMPLEMENT_GLOBAL_SHADER(FRayGenTestAHS, "/Plugin/ISReverb/ISReverbShader.usf", "closestHit=RayTraceTestCHS anyHit=RayTraceTestAHS", SF_RayHitGroup);
+IMPLEMENT_GLOBAL_SHADER(FRayGenTestAHS, "/Plugin/ISReverb/ISReverbShader.usf", "RayTraceTestAHS", SF_RayHitGroup);
+
+class FRayGenTestCHS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FRayGenTestCHS)
+	SHADER_USE_ROOT_PARAMETER_STRUCT(FRayGenTestCHS, FGlobalShader)
+
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		return ShouldCompileRayTracingShadersForProject(Parameters.Platform);
+	}
+
+	static ERayTracingPayloadType GetRayTracingPayloadType(const int32 PermutationId)
+	{
+		return FRayGenTestRGS::GetRayTracingPayloadType(PermutationId);
+	}
+
+	using FParameters = FEmptyShaderParameters;
+};
+IMPLEMENT_GLOBAL_SHADER(FRayGenTestCHS, "/Plugin/ISReverb/ISReverbShader.usf", "anyHit=RayTraceTestAHS closestHit=RayTraceTestCHS", SF_RayHitGroup);
 
 class FRayGenTestMS : public FGlobalShader
 {
@@ -149,6 +151,18 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 #if RHI_RAYTRACING
 {
 	FScene* Scene = Parameters.View->Family->Scene->GetRenderScene();
+	
+	//FScene MyScene = *Parameters.View->Family->Scene->GetRenderScene();
+	
+	//Scene->BatchRemovePrimitives()
+
+	/*
+	Scene->Primitives.RemoveAll([](FPrimitiveSceneInfo* PrimitiveInfo)
+	{
+		return true;
+	});
+	*/
+	
 	FRayTracingScene* RayTracingScene = &Scene->RayTracingScene;
 	
 	FRDGBuilder* GraphBuilder = Parameters.GraphBuilder;
@@ -182,8 +196,12 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 	// set shader parameters
 	FRayGenTestRGS::FParameters *PassParameters = GraphBuilder->AllocParameters<FRayGenTestRGS::FParameters>();
 	PassParameters->ViewUniformBuffer = Parameters.View->ViewUniformBuffer;
-	FRDGBufferSRVRef layerView = RayTracingScene->GetLayerView(ERayTracingSceneLayer::Base);
+	//PassParameters->PrimitiveUniformBuffer = Parameters.View->Family->Scene->GetPrimitiveUniformShaderParameters_RenderThread();
+	//PassParameters->PrimitiveUniformBuffer = Parameters.View->PrimitiveFadeUniformBuffers;
+	PassParameters->PrimitiveUniformBuffer = TUniformBufferBinding<FPrimitiveUniformShaderParameters>();
+	//PassParameters->Scene = Parameters.View->GetSceneUniforms().GetBuffer(*GraphBuilder);
 	PassParameters->outTex = ShaderOutputTextureUAV;
+	FRDGBufferSRVRef layerView = RayTracingScene->GetLayerView(ERayTracingSceneLayer::Base);
 
 	// define render pass needed parameters
 	FRayTracingShaderBindingTable* RayTracingSBT = &Scene->RayTracingSBT;
@@ -199,12 +217,16 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 		{
 			PassParameters->TLAS = layerView->GetRHI();
 			
-			FRayTracingShaderBindingsWriter GlobalResources;
+			//FRayTracingShaderBindingsWriter GlobalResources;
+			//FRHIBatchedShaderParametersAllocator Allocator = FRHIBatchedShaderParametersAllocator(, RHICmdList, FMemStackBase::EPageSize::Small /* FMemStackBase::EPageSize::Large*/);
+			//FRHIBatchedShaderParameters GlobalResources = FRHIBatchedShaderParameters(Allocator);
+			//FRHIBatchedShaderParameters GlobalResources = FRHIBatchedShaderParameters(*RHICmdList.CreateBatchedShaderParameterAllocator(ERHIBatchedShaderParameterAllocatorPageSize::Large));
+			
+			FRHIBatchedShaderParameters GlobalResources = RHICmdList.GetScratchShaderParameters();
 			SetShaderParameters(GlobalResources, RayGenTestRGS, *PassParameters);
 
 			FRayTracingPipelineStateInitializer PSOInitializer;
 			PSOInitializer.MaxPayloadSizeInBytes = GetRayTracingPayloadTypeMaxSize(FRayGenTestRGS::GetRayTracingPayloadType(0));
-			PSOInitializer.bAllowHitGroupIndexing = false;
 
 			// Set RayGen shader
 			TArray<FRHIRayTracingShader*> RayGenShaderTable;
@@ -213,7 +235,7 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 
 			// Set ClosestHit shader
 			TArray<FRHIRayTracingShader*> RayHitShaderTable;
-			RayHitShaderTable.Add(GetGlobalShaderMap(GMaxRHIFeatureLevel)->GetShader<FRayGenTestAHS>().GetRayTracingShader());
+			RayHitShaderTable.Add(GetGlobalShaderMap(GMaxRHIFeatureLevel)->GetShader<FRayGenTestCHS>().GetRayTracingShader());
 			PSOInitializer.SetHitGroupTable(RayHitShaderTable);
 			
 			// Set Miss shader
@@ -224,7 +246,7 @@ void FRayGenTest::Execute_RenderThread(FPostOpaqueRenderParameters& Parameters)
 			// dispatch ray trace shader
 			FRayTracingPipelineState* PipeLine = PipelineStateCache::GetAndOrCreateRayTracingPipelineState(RHICmdList, PSOInitializer);
 			
-			FRHIShaderBindingTable* SBT = RayTracingSBT->AllocateTransientRHI(RHICmdList, ERayTracingShaderBindingMode::RTPSO, ERayTracingHitGroupIndexingMode::Allow, PSOInitializer.GetMaxLocalBindingDataSize());
+			FRHIShaderBindingTable* SBT = RayTracingSBT->AllocateTransientRHI(RHICmdList, ERayTracingShaderBindingMode::RTPSO, ERayTracingHitGroupIndexingMode::Disallow, PSOInitializer.GetMaxLocalBindingDataSize());
 
 			RHICmdList.SetRayTracingMissShader(SBT, 0, PipeLine, 0 /* ShaderIndexInPipeline */, 0, nullptr, 0);
 			RHICmdList.CommitShaderBindingTable(SBT);

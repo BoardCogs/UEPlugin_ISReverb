@@ -53,12 +53,13 @@ void RayTraceTestMS(inout FMinimalPayload data)
 [shader("anyhit")]
 void RayTraceTestAHS(inout FMinimalPayload data, BuiltInTriangleIntersectionAttributes attribs)
 {
-    data.HitT = 1.0f;
+    //IgnoreHit();
 }
-
 
 [shader("closesthit")]
 void RayTraceTestCHS(inout FMinimalPayload data, BuiltInTriangleIntersectionAttributes attribs)
 {
-    //data.HitT = 1.0f;
+    //if (GetPrimitiveData(PrimitiveIndex()).CustomPrimitiveData[0].x == 16.0)
+    //if (GetPrimitiveDataFromUniformBuffer().CustomPrimitiveData[0].x == 16.0)
+        data.HitT = 1.0f;
 }
