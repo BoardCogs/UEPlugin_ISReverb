@@ -39,6 +39,17 @@ void AIS_Room::GetReflectors()
 		if (ChildActor->GetChildActor()->IsA(AIS_ReflectorSurface::StaticClass()))
 		{
 			Surfaces.Add(Cast<AIS_ReflectorSurface>(ChildActor->GetChildActor()));
+
+			TArray<UStaticMeshComponent*> Planes;
+			ChildActor->GetChildActor()->GetComponents<UStaticMeshComponent>(Planes);
+
+			for (UStaticMeshComponent* plane : Planes)
+			{
+				if (plane->GetName() == "Plane")
+				{
+					//plane->SetCustomDepthStencilWriteMask(ERendererStencilMask::ERSM_1);
+				}
+			}
 		}
 	}
 

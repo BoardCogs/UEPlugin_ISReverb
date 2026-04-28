@@ -9,9 +9,13 @@ public class ISReverb : ModuleRules
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
+		PublicDefinitions.Add("RHI_RAYTRACING=1");
+		PublicDefinitions.Add("RHI_RAYTRACING_ALLOWED=1");
+		
 		PublicIncludePaths.AddRange(
 			new string[] {
-				"ISReverb/Public"
+				"ISReverb/Public",
+				"../Shaders/Shared"
 				// ... add public include paths required here ...
 			}
 			);
@@ -21,6 +25,8 @@ public class ISReverb : ModuleRules
 			new string[] {
 				"ISReverb/Private",
 				Path.Combine(GetModuleDirectory("Renderer"), "Internal"),
+				Path.Combine(GetModuleDirectory("Renderer"), "Private"),
+				Path.Combine(GetModuleDirectory("RenderCore"), "Public")
 				// ... add other private include paths required here ...
 			}
 			);
@@ -43,7 +49,11 @@ public class ISReverb : ModuleRules
 			{
 				"CoreUObject",
 				"Engine",
+				"Slate",
+				"SlateCore",
 				"Projects",
+				"RHI",
+				"Renderer"
 				// ... add private dependencies that you statically link with here ...	
 			}
 			);
