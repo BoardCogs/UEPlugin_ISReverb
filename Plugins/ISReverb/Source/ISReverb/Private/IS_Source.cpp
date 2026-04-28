@@ -14,21 +14,6 @@ AIS_Source::AIS_Source()
 void AIS_Source::BeginPlay()
 {
 	Super::BeginPlay();
-
-	Test = FRayGenTest();
-
-	if (RenderTarget != nullptr)
-		UpdateTestParameters();
-}
-
-
-
-void AIS_Source::UpdateTestParameters()
-{
-	FRayGenTestParameters parameters;
-	parameters.CachedRenderTargetSize = FIntPoint(RenderTarget->SizeX, RenderTarget->SizeY);
-	parameters.RenderTarget = RenderTarget;
-	Test.UpdateParameters(parameters);
 }
 
 
@@ -42,12 +27,6 @@ void AIS_Source::GenerateISs()
 	// Generating an ISTree for each listener in the level
 	for (AActor* actor : listeners)
 	{
-		if(RenderTarget != nullptr)
-		{
-			UpdateTestParameters();
-			Test.BeginRendering();	
-		}
-		
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Inside listeners loop"));
 		AIS_Listener* listener = Cast<AIS_Listener>(actor);
 
@@ -159,11 +138,7 @@ void AIS_Source::GenerateAllReflectionPaths()
 void AIS_Source::GenerateRP(AIS_Listener* listener)
 {
 	
-	if (EnableRayTracing && IsRayTracingEnabled())
-	{
-		GenerateRPRT(listener);
-	}
-	else if (EnableMultithreading)
+	if (EnableMultithreading)
 	{
 		GenerateRPMT(listener);
 	}
@@ -171,13 +146,6 @@ void AIS_Source::GenerateRP(AIS_Listener* listener)
 	{
 		GenerateRPLinear(listener);
 	}
-}
-
-
-
-void AIS_Source::GenerateRPRT(AIS_Listener* listener)
-{
-	// Nothing, for now
 }
 
 
