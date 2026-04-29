@@ -14,7 +14,6 @@ AIS_Source::AIS_Source()
 void AIS_Source::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 
@@ -138,14 +137,8 @@ void AIS_Source::GenerateAllReflectionPaths()
 
 void AIS_Source::GenerateRP(AIS_Listener* listener)
 {
-	//GenerateRPLinear(listener, tree);
 	
-	/*
-	if (EnableRayTracing)
-	{
-		//GenerateRPRT(listener, tree);
-	}
-	else */if (EnableMultithreading)
+	if (EnableMultithreading)
 	{
 		GenerateRPMT(listener);
 	}

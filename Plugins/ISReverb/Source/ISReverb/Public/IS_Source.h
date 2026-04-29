@@ -4,6 +4,7 @@
 #include "IS_Tree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
+#include "RenderUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ObjectMacros.h"
 #include "IS_Source.generated.h"

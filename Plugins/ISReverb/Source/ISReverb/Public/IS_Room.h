@@ -26,16 +26,9 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-	// Called upon changes made in the editor.
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
 public:
 	UPROPERTY(EditAnywhere)
 	FString Name;
-	
-	// PROPERTIES
-	UPROPERTY(EditAnywhere)
-	bool VisibleInGame;
 	
 	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
 	TArray<AIS_ReflectorSurface*> Surfaces;
