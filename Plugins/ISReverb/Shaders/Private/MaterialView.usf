@@ -1,25 +1,72 @@
 #include "/Engine/Private/Common.ush"
 #include "/Engine/Private/RayTracing/RayTracingCommon.ush"
 
+#include "/Engine/Private/Montecarlo.ush"
+#include "/Engine/Private/PathTracing/Utilities/PathTracingRandomSequence.ush"
+
+
+
+uint SamplesPerPixel;
+float MaxRayDistance;
+
 DECLARE_SCALAR_ARRAY(int, RenderParams, 3);
 RaytracingAccelerationStructure TLAS;
 RWTexture2D<float4> OutputTexture;
 
+
+
+void GenerateCosineNormalRay(
+	float3 TranslatedWorldPosition,
+	float3 WorldNormal,
+	inout RandomSequence RandSequence,
+	out float3 RayOrigin,
+	out float3 RayDirection,
+	out float RayTMin,
+	out float RayTMax
+)
+{
+	// Draw random variable
+	float2 BufferSize = View.BufferSizeAndInvSize.xy;
+	float2 RandSample = RandomSequence_GenerateSample2D(RandSequence);
+
+	// Perform cosine-hemispherical sampling and convert to world-space
+	float4 Direction_Tangent;
+	#if 1
+	{
+		Direction_Tangent = CosineSampleHemisphereConcentric(RandSample);
+		Direction_Tangent.w = Direction_Tangent.z;
+	}
+	#else
+	{
+		Direction_Tangent = CosineSampleHemisphere(RandSample);
+	}
+	#endif
+
+	float3 Direction_World = TangentToWorld(Direction_Tangent.xyz, WorldNormal);
+
+	RayOrigin = TranslatedWorldPosition;
+	RayDirection = Direction_World;
+	RayTMin = 1.0;
+	RayTMax = MaxRayDistance;
+}
+
+
+
 RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 {
 	uint2 PixelCoord = DispatchRaysIndex().xy + View.ViewRectMin.xy;
-	float2 PixelCenter = float2(PixelCoord) + 0.5f;
+	float2 PixelCenter = float2(PixelCoord) + 0.5;
 	float2 ScreenUV = PixelCenter * View.BufferSizeAndInvSize.zw;
-	float3 MissColor = float3(0.0f, 0.0f, 0.0f);
+	float3 MissColor = float3(0.0, 0.0, 0.0);
 	float3 CameraDir;
 	float3 WorldPos;
-	ReconstructTranslatedWorldPositionAndCameraDirectionFromDeviceZ(PixelCoord, 0.001f, WorldPos, CameraDir);
+	ReconstructTranslatedWorldPositionAndCameraDirectionFromDeviceZ(PixelCoord, 0.001, WorldPos, CameraDir);
 
 	FRayDesc PrimaryRay;
 	PrimaryRay.Origin = View.TranslatedWorldCameraOrigin;
 	PrimaryRay.Direction = CameraDir;
-	PrimaryRay.TMin = 0.0f;
-	PrimaryRay.TMax = 1e20f;
+	PrimaryRay.TMin = 0.0;
+	PrimaryRay.TMax = 1e20;
 	
 	FPackedMaterialClosestHitPayload Payload = (FPackedMaterialClosestHitPayload)0;
 	Payload.SetLumenPayload();
@@ -44,7 +91,7 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 	//Payload.GetBlendingMode();
 	//...
 	
-	float3 HitColor = float3(0.0f, 0.0f, 0.0f);
+	float3 HitColor = float3(0.0, 0.0, 0.0);
 	
 	if (Payload.IsHit())
 	{
@@ -52,36 +99,54 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 		HitColor.y = Payload.GetMetallic();
 		HitColor.z = Payload.GetSpecular();
 
-		float shading = 1.0f;
+		float shading = 1.0;
+		float occlusion = 1.0;
 
+		// Diffuse
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 0))
 		{
 			shading = dot(View.DirectionalLightDirection, Payload.GetWorldNormal());
 			
-			if (shading >= 0.0f)
+			if (shading >= 0.0)
 			{
-				shading = shading * 0.4f + 0.6f;
+				shading = shading * 0.4 + 0.6;
 			}
 			else
 			{
-				shading = 0.6f;
+				shading = 0.6;
 			}
 			
-			//shading = (shading - -1.0f) * (1 - 0.5f) / (1 - -1.0f) + 0.5f;
+			//shading = (shading - -1.0) * (1 - 0.5) / (1 - -1.0) + 0.5;
 		}
-		
-		//uint InstanceID = Payload.GetSceneInstanceIndex();
-		//FInstanceSceneData InstanceData = GetInstanceSceneData(InstanceID);
-		//float3 ForwardVector = normalize(InstanceData.LocalToWorld.M[0].xyz); // forward vector
-		//const uint PrimitiveId = InstanceData.PrimitiveId ;
-		//uint PrimitiveIndex = PrimitiveId * PRIMITIVE_SCENE_DATA_STRIDE;
-		
-		//uint ItemIndex = 0;
-		//uint TargetIdx = PrimitiveIndex + ItemIndex + 35; //Engine/Shaders/Private/SceneData.ush:493
-		//const float4 CustomData = Scene.GPUScene.GPUScenePrimitiveSceneData[TargetIdx];
-		
-		//HitColor = CustomData.xyz;
 
+		// Ambient occlusion
+		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 1))
+		{
+			float HitT = Payload.HitT;
+			float3 HitWorldPos = PrimaryRay.Origin + (PrimaryRay.Direction * HitT);
+
+			uint TimeSeed = View.StateFrameIndex;
+
+			for (uint SampleIndex = 0; SampleIndex < SamplesPerPixel; ++SampleIndex)
+			{
+				FRayDesc Ray;
+
+				RandomSequence RandSequence;
+				RandomSequence_Initialize(RandSequence, PixelCoord, SampleIndex, TimeSeed, SamplesPerPixel);
+
+				GenerateCosineNormalRay(HitWorldPos, Payload.GetWorldNormal(), RandSequence, Ray.Origin, Ray.Direction, Ray.TMin, Ray.TMax);
+
+				FMinimalPayload MinimalPayload = TraceVisibilityRay(
+					TLAS,
+					RAY_FLAG_FORCE_OPAQUE,
+					RAY_TRACING_MASK_OPAQUE,
+					Ray);
+				
+				occlusion -= MinimalPayload.IsMiss() ? 0.0 : 0.1;
+			}
+		}
+
+		// Shadow
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 2))
 		{
 			float HitT = Payload.HitT;
@@ -90,8 +155,8 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			FRayDesc ShadowRay;
 			ShadowRay.Origin = HitWorldPos;
 			ShadowRay.Direction = View.DirectionalLightDirection;
-			ShadowRay.TMin = 1.0f;
-			ShadowRay.TMax = 1e20f;
+			ShadowRay.TMin = 1.0;
+			ShadowRay.TMax = 1e20;
 			
 			TraceMaterialRayPacked(
 				ShadowPayload,
@@ -105,13 +170,13 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				);
 			if (ShadowPayload.IsHit())
 			{
-				shading = 0.6f;
+				shading = 0.6;
 			}
 		}
 
-		OutputTexture[DispatchRaysIndex().xy] = float4(HitColor * shading, 1.0f);
+		OutputTexture[DispatchRaysIndex().xy] = float4(HitColor * shading * occlusion, 1.0);
 		return;
 	}
 
-	OutputTexture[DispatchRaysIndex().xy] = float4(MissColor, 1.0f);
+	OutputTexture[DispatchRaysIndex().xy] = float4(MissColor, 1.0);
 }

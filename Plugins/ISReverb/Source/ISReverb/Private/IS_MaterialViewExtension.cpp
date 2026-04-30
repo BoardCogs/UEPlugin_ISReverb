@@ -2,7 +2,6 @@
 #include "Runtime/Renderer/Internal/PostProcess/PostProcessInputs.h"
 #include "Runtime/Renderer/Private/ScenePrivate.h"
 #include "Runtime/Renderer/Private/SceneRendering.h"
-#include "SceneTextureParameters.h"
 #include "RayTracingShaderBindingLayout.h"
 #include "Nanite/NaniteRayTracing.h"
 #include "RayTracing/RayTracingMaterialHitShaders.h"
@@ -56,6 +55,9 @@ public:
 	SHADER_USE_ROOT_PARAMETER_STRUCT(FMaterialViewRG, FGlobalShader)
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+		SHADER_PARAMETER(int, SamplesPerPixel)
+		SHADER_PARAMETER(float, MaxRayDistance)
+
 		SHADER_PARAMETER_SCALAR_ARRAY(int, RenderParams, [3])
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, OutputTexture)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters, SceneTextures)
@@ -106,8 +108,7 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 		
 		const FIntRect PrimaryViewRect = View.ViewRect;
 		FScreenPassTexture SceneColor((*Inputs.SceneTextures)->SceneColorTexture, PrimaryViewRect);
-
-		//出力用のテクスチャを作成
+		
 		FIntPoint TextureSize = SceneColor.Texture->Desc.Extent;
 		FRDGTextureDesc OutputDesc = FRDGTextureDesc::Create2D(
 			TextureSize,
@@ -124,6 +125,9 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 
 			TShaderMapRef<FMaterialViewRG> RayGenerationShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 			FMaterialViewRG::FParameters* PassParameters = GraphBuilder.AllocParameters<FMaterialViewRG::FParameters>();
+
+			PassParameters->SamplesPerPixel = 5;
+			PassParameters->MaxRayDistance = View.FinalPostProcessSettings.RayTracingAORadius;
 			
 			PassParameters->ViewUniformBuffer = InView.ViewUniformBuffer;
 			PassParameters->TLAS = RayTracingScene.GetLayerView(ERayTracingSceneLayer::Base);
@@ -144,12 +148,10 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 	        {
         		if (!View.MaterialRayTracingData.PipelineState) return;
 	        	
-	        	//シェーダーのバインドをルートシグネチャと合わせるために必要
         		FRHIUniformBuffer* SceneUniformBuffer = PassParameters->Scene->GetRHI();
 				FRHIUniformBuffer* NaniteRayTracingUniformBuffer = PassParameters->NaniteRayTracing->GetRHI();
 				TOptional<FScopedUniformBufferStaticBindings> StaticUniformBufferScope = RayTracing::BindStaticUniformBufferBindings(View, SceneUniformBuffer, NaniteRayTracingUniformBuffer, RHICmdList);
-        		
-	        	//エンジン組み込みのパイプラインを使用する
+	        	
         		FRayTracingPipelineState* PipeLine =View.MaterialRayTracingData.PipelineState; 
 				FShaderBindingTableRHIRef SBT = View.MaterialRayTracingData.ShaderBindingTable;
 	        	
@@ -177,18 +179,3 @@ void FIS_MaterialViewExtension::OnPrepareRayTracing(const class FViewInfo& View,
 	TShaderMapRef<FMaterialViewRG> RayGenerationShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	OutRayGenShaders.Add(RayGenerationShader.GetRayTracingShader());
 }
-
-/*
-//リンカーエラーが出るためSceneRendering.cppから関数をコピー
-const FViewInfo* FViewInfo::GetPrimaryView() const
-{
-	// It is valid for this function to return itself if it's already the primary view.
-	if (Family && Family->Views.IsValidIndex(PrimaryViewIndex))
-	{
-		const FSceneView* PrimaryView = Family->Views[PrimaryViewIndex];
-		check(PrimaryView->bIsViewInfo);
-		return static_cast<const FViewInfo*>(PrimaryView);
-	}
-	return this;
-}
-*/
