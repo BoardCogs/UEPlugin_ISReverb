@@ -8,7 +8,8 @@
 
 uint SamplesPerPixel;
 float MaxRayDistance;
-
+//RWTexture2D<float> RWAmbientOcclusionMaskUAV;
+//RWTexture2D<float> RWAmbientOcclusionHitDistanceUAV;
 DECLARE_SCALAR_ARRAY(int, RenderParams, 3);
 RaytracingAccelerationStructure TLAS;
 RWTexture2D<float4> OutputTexture;
@@ -122,8 +123,11 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 		// Ambient occlusion
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 1))
 		{
+			float hitNum = 0.0;
 			float HitT = Payload.HitT;
 			float3 HitWorldPos = PrimaryRay.Origin + (PrimaryRay.Direction * HitT);
+
+			//float closestRayHitDistance = 10000.0;
 
 			uint TimeSeed = View.StateFrameIndex;
 
@@ -142,10 +146,27 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 					RAY_TRACING_MASK_OPAQUE,
 					Ray);
 				
-				occlusion -= MinimalPayload.IsMiss() ? 0.0 : 0.1;
+				
+				if (MinimalPayload.IsHit())
+				{
+					hitNum += 1.0;
+					//closestRayHitDistance = min(closestRayHitDistance, MinimalPayload.HitT);
+				}
 			}
-		}
 
+			occlusion -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
+			
+			//RWAmbientOcclusionMaskUAV[PixelCoord] = occlusion;
+			//RWAmbientOcclusionHitDistanceUAV[PixelCoord] = closestRayHitDistance == 10000.0 ? -1.0 : closestRayHitDistance;
+		}
+		/*
+		else
+		{
+			RWAmbientOcclusionMaskUAV[PixelCoord] = 1.0;
+			RWAmbientOcclusionHitDistanceUAV[PixelCoord] = 1.0;	
+		}
+		*/
+		
 		// Shadow
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 2))
 		{
