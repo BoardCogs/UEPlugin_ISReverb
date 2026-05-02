@@ -10,7 +10,7 @@ uint SamplesPerPixel;
 float MaxRayDistance;
 //RWTexture2D<float> RWAmbientOcclusionMaskUAV;
 //RWTexture2D<float> RWAmbientOcclusionHitDistanceUAV;
-DECLARE_SCALAR_ARRAY(int, RenderParams, 3);
+DECLARE_SCALAR_ARRAY(int, RenderParams, 4);
 RaytracingAccelerationStructure TLAS;
 RWTexture2D<float4> OutputTexture;
 
@@ -151,10 +151,23 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				{
 					hitNum += 1.0;
 					//closestRayHitDistance = min(closestRayHitDistance, MinimalPayload.HitT);
+
+					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 0)
+					{
+						occlusion -= 0.5 / SamplesPerPixel;	
+					}
 				}
 			}
+			
+			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 1)
+			{
+				occlusion -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2) * ((hitNum + 1) * hitNum / 2);
+			}
 
-			occlusion -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
+			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 2)
+			{
+				occlusion -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
+			}
 			
 			//RWAmbientOcclusionMaskUAV[PixelCoord] = occlusion;
 			//RWAmbientOcclusionHitDistanceUAV[PixelCoord] = closestRayHitDistance == 10000.0 ? -1.0 : closestRayHitDistance;

@@ -33,7 +33,7 @@ static TAutoConsoleVariable<int32> CVarMaterialViewDiffuse(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusion(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusion.Enable"),
-	1,
+	2,
 	TEXT("Enables ambient occlusion for the material view.\n"
 			  "0: Off, 1+: Number of samples per pixel"),
 	ECVF_RenderThreadSafe
@@ -44,6 +44,16 @@ static TAutoConsoleVariable<int32> CVarMaterialViewShadow(
 	0,
 	TEXT("Enables simple shadows (only for directional lights) for the material view.\n"
 			  "0: Off, 1: On"),
+	ECVF_RenderThreadSafe
+);
+
+static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusionMode(
+	TEXT("r.Raytracing.MaterialViewAmbientOcclusionScaling.Set"),
+	1,
+	TEXT("Defines how ambient occlusion scales with number of positive samples.\n"
+			  "0: Linear\n"
+			  "1: Factorial\n"
+			  "2: Exponential"),
 	ECVF_RenderThreadSafe
 );
 
@@ -62,7 +72,7 @@ public:
 		SHADER_PARAMETER(float, MaxRayDistance)
 		//SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float>, RWAmbientOcclusionMaskUAV)
 		//SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float>, RWAmbientOcclusionHitDistanceUAV)
-		SHADER_PARAMETER_SCALAR_ARRAY(int, RenderParams, [3])
+		SHADER_PARAMETER_SCALAR_ARRAY(int, RenderParams, [4])
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, OutputTexture)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters, SceneTextures)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneUniformParameters, Scene)
@@ -156,6 +166,7 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 0) = CVarMaterialViewDiffuse.GetValueOnRenderThread();
 			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 1) = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
 			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 2) = CVarMaterialViewShadow.GetValueOnRenderThread();
+			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 3) = CVarMaterialViewAmbientOcclusionMode.GetValueOnRenderThread();
 			
 			GraphBuilder.AddPass(
 	        RDG_EVENT_NAME("MaterialViewRG"),
