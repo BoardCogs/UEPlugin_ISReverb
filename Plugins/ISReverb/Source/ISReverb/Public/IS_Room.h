@@ -30,15 +30,10 @@ public:
 	UPROPERTY(EditAnywhere)
 	FString Name;
 	
-	UPROPERTY(VisibleDefaultsOnly, SkipSerialization)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<AIS_ReflectorSurface*> Surfaces;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int SurfaceNumber;
-
-	// METHODS
-
-	UFUNCTION(BlueprintCallable)
-	void GetReflectors();
 
 };

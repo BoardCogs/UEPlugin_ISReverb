@@ -17,44 +17,6 @@ void AIS_Room::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	GetReflectors();
-}
-
-
-
-// Collects all reflector surfaces attached to this room
-void AIS_Room::GetReflectors()
-{
-	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Getting reflectors"));
-	
-	TArray<UChildActorComponent*> ChildActors;
-	GetComponents<UChildActorComponent>(ChildActors);
-
-	// Checking all child actors
-	for (UChildActorComponent* ChildActor : ChildActors)
-	{
-		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, ChildActor->GetChildActorName().ToString() );
-
-		// If a child actor is a reflector surface it goes into the array of surfaces
-		if (ChildActor->GetChildActor()->IsA(AIS_ReflectorSurface::StaticClass()))
-		{
-			Surfaces.Add(Cast<AIS_ReflectorSurface>(ChildActor->GetChildActor()));
-
-			/*
-			TArray<UStaticMeshComponent*> Planes;
-			ChildActor->GetChildActor()->GetComponents<UStaticMeshComponent>(Planes);
-
-			for (UStaticMeshComponent* plane : Planes)
-			{
-				if (plane->GetName() == "Plane")
-				{
-					//plane->SetCustomDepthStencilWriteMask(ERendererStencilMask::ERSM_1);
-				}
-			}
-			*/
-		}
-	}
-
 	// Giving all reflectors a room-relative id 
 	int i = 0;
 	for (AIS_ReflectorSurface* s : Surfaces)
