@@ -509,7 +509,8 @@ void AIS_Source::DrawDebug()
 	if (drawImageSources)
 	{
 		// Original source
-		DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
+		DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
+		//DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
 
 		// Image Sources
 		if (trees.Num() > 0)
@@ -521,7 +522,8 @@ void AIS_Source::DrawDebug()
 			for (IS* node : trees[listeners[0]].Nodes())
 			{
 				if (node->Valid == true)
-					DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
+					DrawDebugPoint(GetWorld(), FVector(node->Position), 10, FColor::Green, true, -1);
+					//DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
 			}
 		}	
 	}
@@ -603,7 +605,8 @@ void AIS_Source::DrawDebug()
 				parentNode = node->Parent;
 
 				// Highlights the IS in red
-				DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
+				DrawDebugPoint(GetWorld(), FVector(node->Position), 15, FColor::Red, true, -1);
+				//DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
 
 				// Draws the resulting beam projection on the reflector
 				for (IS_ReflectorEdge edge : node->BeamPoints.Edges())
@@ -619,7 +622,8 @@ void AIS_Source::DrawDebug()
 
 				// Highlights the parent IS in blue
 				IS* nodeParent = nodes[node->Parent];
-				DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
+				DrawDebugPoint(GetWorld(), FVector(nodeParent->Position), 15, FColor::Blue, true, -1);
+				//DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
 
 				// Draws parent beam points
 				for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())

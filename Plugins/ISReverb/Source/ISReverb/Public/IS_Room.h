@@ -29,6 +29,9 @@ protected:
 public:
 	UPROPERTY(EditAnywhere)
 	FString Name;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool SurfacesVisibleInGame = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<AIS_ReflectorSurface*> Surfaces;
