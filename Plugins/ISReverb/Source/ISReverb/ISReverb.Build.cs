@@ -36,9 +36,14 @@ public class ISReverb : ModuleRules
 			new string[]
 			{
 				"Core",
+				"CoreUObject",
+				"Engine",
+				"InputCore",
+				"UMG",
+				"Niagara",
 				"RenderCore",
 				"Renderer",
-				"RHI",
+				"RHI"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

@@ -1,19 +1,26 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "IS_SoundRayArray.h"
 
-UIS_SoundRayArray::UIS_SoundRayArray()
+IS_SoundRayArray::IS_SoundRayArray()
 {
-	SoundRays = TArray<UIS_SoundRay>();
+	SoundRays = TArray<IS_SoundRay>();
 }
 
-int UIS_SoundRayArray::GetNumRays()
+void IS_SoundRayArray::Empty()
+{
+	SoundRays.Empty();
+}
+
+void IS_SoundRayArray::AddRay(IS_SoundRay Ray)
+{
+	SoundRays.Add(Ray);
+}
+
+int IS_SoundRayArray::GetNumRays()
 {
 	return SoundRays.Num();
 }
 
-UIS_SoundRay* UIS_SoundRayArray::GetRay(int i)
+IS_SoundRay* IS_SoundRayArray::GetRay(int i)
 {
 	return &SoundRays[i];
 }

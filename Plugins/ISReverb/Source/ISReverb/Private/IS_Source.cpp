@@ -158,6 +158,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 	TArray<IS*> nodes = trees[listener].Nodes();
 
+	SoundRays.Empty();
+	IS_SoundRay soundRay = IS_SoundRay();
+
 	int validPaths = 0;
 
 	for (IS* node : nodes)
@@ -184,6 +187,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 			currentIndex = node->Index;
 			from = listenerPos;
 
+			// Iterating all checks going up the IS tree
 			while (currentIndex != -1)
 			{
 				currentNode = nodes[currentIndex];
@@ -220,6 +224,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 				currentIndex = currentNode->Parent;
 			}
 
+			// Final check from last intersection to source
 			if (node->HasPath)
 			{
 				to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
@@ -235,6 +240,59 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					intersections.Add( FVector3f( hit.ImpactPoint ) );
 					node->HasPath = false;
 				}
+			}
+
+			// Adding sound ray if valid
+			if (node->HasPath)
+			{
+				soundRay.Clear();
+
+				// Adding first point (source) and setting the position from which the sound arrives to listener
+				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[intersections.Num() - 1], -1, soundAmplitude) );
+				soundRay.ISPosition = node->Position;
+
+				// Sound amplitude is reduced by 6 dB each time distance doubles
+				// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
+				float cumulativeDistance = 0.0f;
+				// Total drop in amplitude due to cumulative distance from source
+				float totalDrop;
+				// Drop in amplitude in last ray point
+				float lastAmplitudeDrop = 0.0f;
+				// Drop in amplitude in this segment of the ray (total - last)
+				float drop;
+				// Amplitude arriving at the ray point 
+				float inAmp;
+
+				for (int i = intersections.Num() - 1; i > 1; i--)
+				{
+					// Adding the cumulative distance from source
+					cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
+					
+					// Total drop in amplitude is log2( totalDistance / initialDistance )
+					// Where initialDistance is the distance of the original amplitude (again, assumed to be 1 meter)
+					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+					
+					// This is the factor by how much the amplitude drops in this segment of the ray
+					drop = totalDrop - lastAmplitudeDrop;
+					
+					// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
+					inAmp = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude - (drop * 6);
+					
+					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.95) );
+					
+					lastAmplitudeDrop = totalDrop;
+				}
+
+				// All operations are repeated for the last point
+				cumulativeDistance += (intersections[0] - intersections[1]).Length();
+				totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+				drop = totalDrop - lastAmplitudeDrop;
+				inAmp = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude - (drop * 6);
+				
+				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp,-1) );
+				soundRay.FinalAmplitude = inAmp;
+
+				SoundRays.AddRay(soundRay);
 			}
 			
 			node->Path = TArray(intersections);
@@ -254,6 +312,8 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 {
+	SoundRays.Empty();
+	
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener]()
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
@@ -267,6 +327,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 		int validISs = 0;
 
 		FCriticalSection validISsLock;
+		FCriticalSection SoundRaysLock;
 		
 		ParallelFor(nodes.Num(), [&](int32 index) mutable
 		{
@@ -294,6 +355,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 				currentIndex = node->Index;
 				from = listenerPos;
 
+				// Iterating all checks going up the IS tree
 				while (currentIndex != -1)
 				{
 					currentNode = nodes[currentIndex];
@@ -330,6 +392,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 					currentIndex = currentNode->Parent;
 				}
 
+				// Final check from last intersection to source
 				if (node->HasPath)
 				{
 					to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
@@ -348,6 +411,63 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						intersections.Add( FVector3f( hit.ImpactPoint ) );
 						node->HasPath = false;
 					}
+				}
+
+				// Adding sound ray if valid
+				if (node->HasPath)
+				{
+					IS_SoundRay soundRay = IS_SoundRay();
+
+					// Adding first point (source) and setting the position from which the sound arrives to listener
+					soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1], -1, FMath::Max(soundAmplitude, 0.0) ) );
+					soundRay.ISPosition = node->Position;
+
+					// Sound amplitude is reduced by 6 dB each time distance doubles
+					// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
+					float cumulativeDistance = 0.0f;
+					// Total drop in amplitude due to cumulative distance from source
+					float totalDrop;
+					// Drop in amplitude in last ray point
+					float lastAmplitudeDrop = 0.0f;
+					// Drop in amplitude in this segment of the ray (total - last)
+					float drop;
+					// Amplitude arriving at the ray point 
+					float inAmp;
+
+					for (int i = intersections.Num() - 1; i > 1; i--)
+					{
+						// Adding the cumulative distance from source
+						cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
+						
+						// Total drop in amplitude is log2( totalDistance / initialDistance )
+						// Where initialDistance is the distance of the original amplitude (again, assumed to be 1 meter)
+						totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+						
+						// This is the factor by how much the amplitude drops in this segment of the ray
+						drop = totalDrop - lastAmplitudeDrop;
+						
+						// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
+						inAmp = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude - (drop * 6);
+						inAmp = FMath::Max(inAmp, 0.0);
+						
+						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.95) );
+						
+						lastAmplitudeDrop = totalDrop;
+					}
+
+					// All operations are repeated for the last point
+					cumulativeDistance += (intersections[0] - intersections[1]).Length();
+					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+					drop = totalDrop - lastAmplitudeDrop;
+					inAmp = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude - (drop * 6);
+					inAmp = FMath::Max(inAmp, 0.0);
+					
+					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp,-1) );
+					soundRay.FinalAmplitude = inAmp;
+
+					SoundRaysLock.Lock();
+					SoundRays.AddRay(soundRay);
+					SoundRaysLock.Unlock();
 				}
 				
 				node->Path = TArray(intersections);
@@ -502,6 +622,56 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 void AIS_Source::DrawDebug()
 {
 	FlushPersistentDebugLines(GetWorld());
+
+	if (SoundRays.GetNumRays() > 0)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Palle1"));
+
+		UE_LOG(LogTemp, Display, TEXT("Total number of rays in SoundRays: %i\n"), SoundRays.GetNumRays());
+	}
+
+	if (SoundRayFX->IsValid())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Palle2"));
+	}
+
+	if (NiagaraActor != nullptr)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Palle3"));
+	}
+
+	if (SoundRays.GetNumRays() > 0 && SoundRayFX->IsValid() && NiagaraActor != nullptr)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Cristo"));
+		
+		//UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(SoundRayFX, this, NAME_None, FVector(0.f), FRotator(0.f), EAttachLocation::Type::KeepRelativeOffset, true);
+		//UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+
+		TArray<FVector> Ray = TArray<FVector>();
+		TArray<float> Amplitudes = TArray<float>();
+
+		IS_SoundRay* ray = SoundRays.GetRay(0);
+		IS_SoundRayPoint* point;
+
+		for (int i = 0 ; i < ray->GetNumRayPoints() ; i++)
+		{
+			point = ray->GetRayPoint(i);
+
+			Ray.Add(FVector(point->PointPosition));
+			Amplitudes.Add(point->InAmplitude);
+			Amplitudes.Add(point->OutAmplitude);
+		}
+
+		UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
+
+		if (NiagaraComp != nullptr)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Cristo2"));
+			
+			UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
+			UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);	
+		}
+	}
 
 
 	

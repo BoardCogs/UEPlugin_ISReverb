@@ -2,28 +2,30 @@
 
 #include "CoreMinimal.h"
 #include "IS_SoundRayPoint.h"
-#include "UObject/NoExportTypes.h"
-#include "IS_SoundRay.generated.h"
 
 /**
  * 
  */
-UCLASS()
-class ISREVERB_API UIS_SoundRay : public UObject
+class ISREVERB_API IS_SoundRay
 {
-	GENERATED_BODY()
-
+	
 public:
-	UIS_SoundRay();
+	// Methods
+	
+	IS_SoundRay();
+
+	void Clear();
+
+	void AddRayPoint(IS_SoundRayPoint point);
+
+	int GetNumRayPoints();
+	
+	IS_SoundRayPoint* GetRayPoint(int i);
+
+	// Properties
 
 	// All points along which the sound ray gets reflected, plus source and listener as first and last point respectively
-	TArray<UIS_SoundRayPoint> RayPoints;
-
-	UFUNCTION(BlueprintCallable)
-	int GetNumRayPoints();
-
-	UFUNCTION(BlueprintCallable)
-	UIS_SoundRayPoint* GetRayPoint(int i);
+	TArray<IS_SoundRayPoint> RayPoints;
 
 	// The final amplitude of the reverb reaching the listener
 	float FinalAmplitude;
