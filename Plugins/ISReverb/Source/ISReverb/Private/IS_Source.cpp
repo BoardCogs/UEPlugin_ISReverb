@@ -623,54 +623,81 @@ void AIS_Source::DrawDebug()
 {
 	FlushPersistentDebugLines(GetWorld());
 
-	if (SoundRays.GetNumRays() > 0)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Palle1"));
-
-		UE_LOG(LogTemp, Display, TEXT("Total number of rays in SoundRays: %i\n"), SoundRays.GetNumRays());
-	}
-
 	if (SoundRayFX->IsValid())
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Palle2"));
-	}
-
-	if (NiagaraActor != nullptr)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Palle3"));
-	}
-
-	if (SoundRays.GetNumRays() > 0 && SoundRayFX->IsValid() && NiagaraActor != nullptr)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Cristo"));
-		
-		//UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(SoundRayFX, this, NAME_None, FVector(0.f), FRotator(0.f), EAttachLocation::Type::KeepRelativeOffset, true);
-		//UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
-
-		TArray<FVector> Ray = TArray<FVector>();
-		TArray<float> Amplitudes = TArray<float>();
-
-		IS_SoundRay* ray = SoundRays.GetRay(0);
-		IS_SoundRayPoint* point;
-
-		for (int i = 0 ; i < ray->GetNumRayPoints() ; i++)
+		// i iterates on the sound rays
+		int i = 0;
+		// n iterates on the niagara effects
+		int n = 0;
+		for ( ; i < SoundRays.GetNumRays(); i++)
 		{
-			point = ray->GetRayPoint(i);
+			//UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(SoundRayFX, this, NAME_None, FVector(0.f), FRotator(0.f), EAttachLocation::Type::KeepRelativeOffset, true);
 
-			Ray.Add(FVector(point->PointPosition));
-			Amplitudes.Add(point->InAmplitude);
-			Amplitudes.Add(point->OutAmplitude);
+			UNiagaraComponent* NiagaraComp = nullptr;
+
+			if (NiagaraEffects.Num() > n)
+			{
+				if (NiagaraEffects[n] != nullptr)
+				{
+					NiagaraComp = NiagaraEffects[n];
+				}
+				else
+				{
+					NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+					NiagaraEffects.Insert( NiagaraComp , n );
+				}
+			}
+			else
+			{
+				NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+				NiagaraEffects.Add( NiagaraComp );	
+			}
+
+			TArray<FVector> Ray = TArray<FVector>();
+			TArray<float> Amplitudes = TArray<float>();
+
+			IS_SoundRay* ray = SoundRays.GetRay(i);
+			IS_SoundRayPoint* point;
+
+			for (int j = 0 ; j < ray->GetNumRayPoints() ; j++)
+			{
+				point = ray->GetRayPoint(j);
+
+				Ray.Add(FVector(point->PointPosition));
+				Amplitudes.Add(point->InAmplitude);
+				Amplitudes.Add(point->OutAmplitude);
+			}
+
+			//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
+
+			if (NiagaraComp != nullptr)
+			{
+				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
+				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);
+				NiagaraComp->Activate(true);
+			}
+
+			n++;
 		}
 
-		UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
-
-		if (NiagaraComp != nullptr)
+		for ( ; n < NiagaraEffects.Num(); n++)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, TEXT("Cristo2"));
-			
-			UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
-			UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);	
+			if (NiagaraEffects[n] != nullptr)
+			{
+				NiagaraEffects[n]->DestroyInstance();
+				NiagaraEffects.RemoveAt(n);
+				n--;
+			}
+			else
+			{
+				NiagaraEffects.RemoveAt(n);
+				n--;
+			}
 		}
+	}
+	else
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Warning: the selected Niagara System is not valid, please select IS_SoundRaysFX"));
 	}
 
 

@@ -33,6 +33,8 @@ private:
 
     IS_SoundRayArray SoundRays = IS_SoundRayArray();
 
+    TArray<UNiagaraComponent*> NiagaraEffects;
+
 public:
     /* The room(s) the source is currently in */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -45,9 +47,6 @@ public:
     /* The Niagara System to spawn to visualize sound rays */
     UPROPERTY(EditAnywhere)
     UNiagaraSystem* SoundRayFX;
-
-    UPROPERTY(EditAnywhere)
-    AActor* NiagaraActor;
 
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
