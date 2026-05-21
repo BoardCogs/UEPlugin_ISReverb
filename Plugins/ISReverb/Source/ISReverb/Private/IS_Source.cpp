@@ -623,83 +623,6 @@ void AIS_Source::DrawDebug()
 {
 	FlushPersistentDebugLines(GetWorld());
 
-	if (SoundRayFX->IsValid())
-	{
-		// i iterates on the sound rays
-		int i = 0;
-		// n iterates on the niagara effects
-		int n = 0;
-		for ( ; i < SoundRays.GetNumRays(); i++)
-		{
-			//UNiagaraComponent* NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAttached(SoundRayFX, this, NAME_None, FVector(0.f), FRotator(0.f), EAttachLocation::Type::KeepRelativeOffset, true);
-
-			UNiagaraComponent* NiagaraComp = nullptr;
-
-			if (NiagaraEffects.Num() > n)
-			{
-				if (NiagaraEffects[n] != nullptr)
-				{
-					NiagaraComp = NiagaraEffects[n];
-				}
-				else
-				{
-					NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
-					NiagaraEffects.Insert( NiagaraComp , n );
-				}
-			}
-			else
-			{
-				NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
-				NiagaraEffects.Add( NiagaraComp );	
-			}
-
-			TArray<FVector> Ray = TArray<FVector>();
-			TArray<float> Amplitudes = TArray<float>();
-
-			IS_SoundRay* ray = SoundRays.GetRay(i);
-			IS_SoundRayPoint* point;
-
-			for (int j = 0 ; j < ray->GetNumRayPoints() ; j++)
-			{
-				point = ray->GetRayPoint(j);
-
-				Ray.Add(FVector(point->PointPosition));
-				Amplitudes.Add(point->InAmplitude);
-				Amplitudes.Add(point->OutAmplitude);
-			}
-
-			//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
-
-			if (NiagaraComp != nullptr)
-			{
-				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
-				UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);
-				NiagaraComp->Activate(true);
-			}
-
-			n++;
-		}
-
-		for ( ; n < NiagaraEffects.Num(); n++)
-		{
-			if (NiagaraEffects[n] != nullptr)
-			{
-				NiagaraEffects[n]->DestroyInstance();
-				NiagaraEffects.RemoveAt(n);
-				n--;
-			}
-			else
-			{
-				NiagaraEffects.RemoveAt(n);
-				n--;
-			}
-		}
-	}
-	else
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Warning: the selected Niagara System is not valid, please select IS_SoundRaysFX"));
-	}
-
 
 	
 	// Draws original source and ISs
@@ -730,6 +653,92 @@ void AIS_Source::DrawDebug()
 	//Draw all reflections paths in a given order interval
 	if (MinOrder != -1 || MaxOrder != -1)
 	{
+		// Check if the niagara system is valid
+		if (SoundRayFX->IsValid())
+		{
+			// i iterates on the sound rays
+			int i = 0;
+			// n iterates on the niagara effects
+			int n = 0;
+
+			// For all sound rays
+			for ( ; i < SoundRays.GetNumRays(); i++)
+			{
+				// Ray order equals number of points -2 (source and listener are not reflections)
+				int rayOrder = SoundRays.GetRay(i)->GetNumRayPoints() - 2;
+
+				// Draw the ray if it's in the specified order range
+				if (rayOrder >= MinOrder && rayOrder <= MaxOrder)
+				{
+					UNiagaraComponent* NiagaraComp = nullptr;
+
+					if (NiagaraEffects.Num() > n)
+					{
+						if (NiagaraEffects[n] != nullptr)
+						{
+							NiagaraComp = NiagaraEffects[n];
+						}
+						else
+						{
+							NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+							NiagaraEffects.Insert( NiagaraComp , n );
+						}
+					}
+					else
+					{
+						NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+						NiagaraEffects.Add( NiagaraComp );	
+					}
+
+					TArray<FVector> Ray = TArray<FVector>();
+					TArray<float> Amplitudes = TArray<float>();
+
+					IS_SoundRay* ray = SoundRays.GetRay(i);
+					IS_SoundRayPoint* point;
+
+					for (int j = 0 ; j < ray->GetNumRayPoints() ; j++)
+					{
+						point = ray->GetRayPoint(j);
+
+						Ray.Add(FVector(point->PointPosition));
+						Amplitudes.Add(point->InAmplitude);
+						Amplitudes.Add(point->OutAmplitude);
+					}
+
+					//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
+
+					if (NiagaraComp != nullptr)
+					{
+						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
+						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);
+						NiagaraComp->Activate(true);
+					}
+
+					n++;
+				}
+			}
+
+			for ( ; n < NiagaraEffects.Num(); n++)
+			{
+				if (NiagaraEffects[n] != nullptr)
+				{
+					NiagaraEffects[n]->DestroyInstance();
+					NiagaraEffects.RemoveAt(n);
+					n--;
+				}
+				else
+				{
+					NiagaraEffects.RemoveAt(n);
+					n--;
+				}
+			}
+		}
+		else
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Warning: the selected Niagara System is not valid, please select IS_SoundRaysFX"));
+		}
+
+		/*
 		if (trees.Num() > 0)
 		{
 			// Getting the first listener (tests should only be performed with one)
@@ -750,6 +759,7 @@ void AIS_Source::DrawDebug()
 					break;
 			}
 		}
+		*/
 	}
 	
 
