@@ -1,9 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraDataInterfaceArrayFunctionLibrary.h"
+#include "NiagaraComponent.h"
 #include "IS_Tree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
+#include "IS_SoundRayArray.h"
 #include "RenderUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/ObjectMacros.h"
@@ -27,16 +31,24 @@ private:
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, IS_Tree> trees;
 
+    IS_SoundRayArray SoundRays = IS_SoundRayArray();
+
+    TArray<UNiagaraComponent*> NiagaraEffects;
+
 public:
-    /* The room(s) the source is currently in. */
+    /* The room(s) the source is currently in */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     FString Room;
     
-    /* The trace channel for sound reflection. */
+    /* The trace channel for sound reflection */
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
 
-    /* Set to true to enable using multithreading on CPU-heavy computations (recommended). */
+    /* The Niagara System to spawn to visualize sound rays */
+    UPROPERTY(EditAnywhere)
+    UNiagaraSystem* SoundRayFX;
+
+    /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
 
@@ -51,6 +63,10 @@ public:
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
     int order;
+
+    /* Sound amplitude at 1 meter from source, in dB */
+    UPROPERTY(EditAnywhere)
+    float soundAmplitude;
 
     /* Set to true to visualize ISs (performance heavy) */
     UPROPERTY(EditAnywhere)

@@ -1,13 +1,15 @@
 ﻿#include "IS_MaterialViewExtension.h"
 #include "Runtime/Renderer/Internal/PostProcess/PostProcessInputs.h"
+//#include "Runtime/Renderer/Private/ScreenSpaceDenoise.h"
 #include "Runtime/Renderer/Private/ScenePrivate.h"
 #include "Runtime/Renderer/Private/SceneRendering.h"
-#include "SceneTextureParameters.h"
 #include "RayTracingShaderBindingLayout.h"
 #include "Nanite/NaniteRayTracing.h"
 #include "RayTracing/RayTracingMaterialHitShaders.h"
 #include "MaterialShaderType.h"
 #include "RHIResources.h"
+
+
 
 static TAutoConsoleVariable<int32> CVarMaterialView(
 	TEXT("r.Raytracing.MaterialView.Enable"),
@@ -31,9 +33,9 @@ static TAutoConsoleVariable<int32> CVarMaterialViewDiffuse(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusion(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusion.Enable"),
-	0,
+	5,
 	TEXT("Enables ambient occlusion for the material view.\n"
-			  "0: Off, 1: On"),
+			  "0: Off, 1+: Number of samples per pixel"),
 	ECVF_RenderThreadSafe
 );
 
@@ -42,6 +44,16 @@ static TAutoConsoleVariable<int32> CVarMaterialViewShadow(
 	0,
 	TEXT("Enables simple shadows (only for directional lights) for the material view.\n"
 			  "0: Off, 1: On"),
+	ECVF_RenderThreadSafe
+);
+
+static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusionMode(
+	TEXT("r.Raytracing.MaterialViewAmbientOcclusionScaling.Set"),
+	1,
+	TEXT("Defines how ambient occlusion scales with number of positive samples.\n"
+			  "0: Linear\n"
+			  "1: Factorial\n"
+			  "2: Exponential"),
 	ECVF_RenderThreadSafe
 );
 
@@ -56,7 +68,11 @@ public:
 	SHADER_USE_ROOT_PARAMETER_STRUCT(FMaterialViewRG, FGlobalShader)
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_SCALAR_ARRAY(int, RenderParams, [3])
+		SHADER_PARAMETER(int, SamplesPerPixel)
+		SHADER_PARAMETER(float, MaxRayDistance)
+		//SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float>, RWAmbientOcclusionMaskUAV)
+		//SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float>, RWAmbientOcclusionHitDistanceUAV)
+		SHADER_PARAMETER_SCALAR_ARRAY(int, RenderParams, [4])
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, OutputTexture)
 		SHADER_PARAMETER_STRUCT_INCLUDE(FSceneTextureShaderParameters, SceneTextures)
 		SHADER_PARAMETER_RDG_UNIFORM_BUFFER(FSceneUniformParameters, Scene)
@@ -106,8 +122,7 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 		
 		const FIntRect PrimaryViewRect = View.ViewRect;
 		FScreenPassTexture SceneColor((*Inputs.SceneTextures)->SceneColorTexture, PrimaryViewRect);
-
-		//出力用のテクスチャを作成
+		
 		FIntPoint TextureSize = SceneColor.Texture->Desc.Extent;
 		FRDGTextureDesc OutputDesc = FRDGTextureDesc::Create2D(
 			TextureSize,
@@ -118,13 +133,29 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 
 		FRDGTexture* OutputRDGTexture = GraphBuilder.CreateTexture(OutputDesc, TEXT("MaterialView.Output"));
 		FRDGTextureUAV* OutputUAV = GraphBuilder.CreateUAV(OutputRDGTexture);
+
+		/*
+		IScreenSpaceDenoiser::FAmbientOcclusionInputs DenoiserInputs;
+		{
+			FRDGTextureDesc Desc = FRDGTextureDesc::Create2D(
+				TextureSize,
+				PF_R16F,
+				FClearValueBinding::None,
+				TexCreate_ShaderResource | TexCreate_RenderTargetable | TexCreate_UAV);
+			DenoiserInputs.Mask = GraphBuilder.CreateTexture(Desc, TEXT("RayTracingAmbientOcclusion"));
+			DenoiserInputs.RayHitDistance = GraphBuilder.CreateTexture(Desc, TEXT("RayTracingAmbientOcclusionHitDistance"));
+		}
+		*/
 		
 		//pass param
 		{
-
 			TShaderMapRef<FMaterialViewRG> RayGenerationShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 			FMaterialViewRG::FParameters* PassParameters = GraphBuilder.AllocParameters<FMaterialViewRG::FParameters>();
-			
+
+			PassParameters->SamplesPerPixel = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
+			PassParameters->MaxRayDistance = View.FinalPostProcessSettings.RayTracingAORadius;
+			//PassParameters->RWAmbientOcclusionMaskUAV = GraphBuilder.CreateUAV(DenoiserInputs.Mask);
+			//PassParameters->RWAmbientOcclusionHitDistanceUAV = GraphBuilder.CreateUAV(DenoiserInputs.RayHitDistance);
 			PassParameters->ViewUniformBuffer = InView.ViewUniformBuffer;
 			PassParameters->TLAS = RayTracingScene.GetLayerView(ERayTracingSceneLayer::Base);
 			PassParameters->Scene = GetSceneUniformBufferRef(GraphBuilder, InView);
@@ -135,6 +166,7 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 0) = CVarMaterialViewDiffuse.GetValueOnRenderThread();
 			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 1) = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
 			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 2) = CVarMaterialViewShadow.GetValueOnRenderThread();
+			GET_SCALAR_ARRAY_ELEMENT(PassParameters->RenderParams, 3) = CVarMaterialViewAmbientOcclusionMode.GetValueOnRenderThread();
 			
 			GraphBuilder.AddPass(
 	        RDG_EVENT_NAME("MaterialViewRG"),
@@ -144,12 +176,10 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 	        {
         		if (!View.MaterialRayTracingData.PipelineState) return;
 	        	
-	        	//シェーダーのバインドをルートシグネチャと合わせるために必要
         		FRHIUniformBuffer* SceneUniformBuffer = PassParameters->Scene->GetRHI();
 				FRHIUniformBuffer* NaniteRayTracingUniformBuffer = PassParameters->NaniteRayTracing->GetRHI();
 				TOptional<FScopedUniformBufferStaticBindings> StaticUniformBufferScope = RayTracing::BindStaticUniformBufferBindings(View, SceneUniformBuffer, NaniteRayTracingUniformBuffer, RHICmdList);
-        		
-	        	//エンジン組み込みのパイプラインを使用する
+	        	
         		FRayTracingPipelineState* PipeLine =View.MaterialRayTracingData.PipelineState; 
 				FShaderBindingTableRHIRef SBT = View.MaterialRayTracingData.ShaderBindingTable;
 	        	
@@ -166,6 +196,23 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 	        }
 		);
 		}
+		
+		/*
+		const IScreenSpaceDenoiser* DefaultDenoiser = IScreenSpaceDenoiser::GetDefaultDenoiser();
+		
+		IScreenSpaceDenoiser::FAmbientOcclusionRayTracingConfig RayTracingConfig;
+		RayTracingConfig.RayCountPerPixel = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
+
+		IScreenSpaceDenoiser::FAmbientOcclusionOutputs DenoiserOutputs = DefaultDenoiser->DenoiseAmbientOcclusion(
+			GraphBuilder,
+			View,
+			&View.PrevViewInfo,
+			FSceneTextureParameters(),
+			DenoiserInputs,
+			RayTracingConfig);
+		
+		//OutputRDGTexture = OutputRDGTexture + DenoiserOutputs.AmbientOcclusionMask;
+		*/
 
 		AddCopyTexturePass(GraphBuilder, OutputRDGTexture, SceneColor.Texture);
 	}
@@ -177,18 +224,3 @@ void FIS_MaterialViewExtension::OnPrepareRayTracing(const class FViewInfo& View,
 	TShaderMapRef<FMaterialViewRG> RayGenerationShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 	OutRayGenShaders.Add(RayGenerationShader.GetRayTracingShader());
 }
-
-/*
-//リンカーエラーが出るためSceneRendering.cppから関数をコピー
-const FViewInfo* FViewInfo::GetPrimaryView() const
-{
-	// It is valid for this function to return itself if it's already the primary view.
-	if (Family && Family->Views.IsValidIndex(PrimaryViewIndex))
-	{
-		const FSceneView* PrimaryView = Family->Views[PrimaryViewIndex];
-		check(PrimaryView->bIsViewInfo);
-		return static_cast<const FViewInfo*>(PrimaryView);
-	}
-	return this;
-}
-*/

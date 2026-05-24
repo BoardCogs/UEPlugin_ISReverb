@@ -158,6 +158,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 	TArray<IS*> nodes = trees[listener].Nodes();
 
+	SoundRays.Empty();
+	IS_SoundRay soundRay = IS_SoundRay();
+
 	int validPaths = 0;
 
 	for (IS* node : nodes)
@@ -184,6 +187,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 			currentIndex = node->Index;
 			from = listenerPos;
 
+			// Iterating all checks going up the IS tree
 			while (currentIndex != -1)
 			{
 				currentNode = nodes[currentIndex];
@@ -220,6 +224,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 				currentIndex = currentNode->Parent;
 			}
 
+			// Final check from last intersection to source
 			if (node->HasPath)
 			{
 				to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
@@ -235,6 +240,59 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					intersections.Add( FVector3f( hit.ImpactPoint ) );
 					node->HasPath = false;
 				}
+			}
+
+			// Adding sound ray if valid
+			if (node->HasPath)
+			{
+				soundRay.Clear();
+
+				// Adding first point (source) and setting the position from which the sound arrives to listener
+				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[intersections.Num() - 1], -1, soundAmplitude) );
+				soundRay.ISPosition = node->Position;
+
+				// Sound amplitude is reduced by 6 dB each time distance doubles
+				// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
+				float cumulativeDistance = 0.0f;
+				// Total drop in amplitude due to cumulative distance from source
+				float totalDrop;
+				// Drop in amplitude in last ray point
+				float lastAmplitudeDrop = 0.0f;
+				// Drop in amplitude in this segment of the ray (total - last)
+				float drop;
+				// Amplitude arriving at the ray point 
+				float inAmp;
+
+				for (int i = intersections.Num() - 1; i > 1; i--)
+				{
+					// Adding the cumulative distance from source
+					cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
+					
+					// Total drop in amplitude is log2( totalDistance / initialDistance )
+					// Where initialDistance is the distance of the original amplitude (again, assumed to be 1 meter)
+					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+					
+					// This is the factor by how much the amplitude drops in this segment of the ray
+					drop = totalDrop - lastAmplitudeDrop;
+					
+					// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
+					inAmp = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude - (drop * 6);
+					
+					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.90) );
+					
+					lastAmplitudeDrop = totalDrop;
+				}
+
+				// All operations are repeated for the last point
+				cumulativeDistance += (intersections[0] - intersections[1]).Length();
+				totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+				drop = totalDrop - lastAmplitudeDrop;
+				inAmp = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude - (drop * 6);
+				
+				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp,-1) );
+				soundRay.FinalAmplitude = inAmp;
+
+				SoundRays.AddRay(soundRay);
 			}
 			
 			node->Path = TArray(intersections);
@@ -254,6 +312,8 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 {
+	SoundRays.Empty();
+	
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener]()
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
@@ -267,6 +327,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 		int validISs = 0;
 
 		FCriticalSection validISsLock;
+		FCriticalSection SoundRaysLock;
 		
 		ParallelFor(nodes.Num(), [&](int32 index) mutable
 		{
@@ -294,6 +355,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 				currentIndex = node->Index;
 				from = listenerPos;
 
+				// Iterating all checks going up the IS tree
 				while (currentIndex != -1)
 				{
 					currentNode = nodes[currentIndex];
@@ -330,6 +392,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 					currentIndex = currentNode->Parent;
 				}
 
+				// Final check from last intersection to source
 				if (node->HasPath)
 				{
 					to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
@@ -348,6 +411,63 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						intersections.Add( FVector3f( hit.ImpactPoint ) );
 						node->HasPath = false;
 					}
+				}
+
+				// Adding sound ray if valid
+				if (node->HasPath)
+				{
+					IS_SoundRay soundRay = IS_SoundRay();
+
+					// Adding first point (source) and setting the position from which the sound arrives to listener
+					soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1], -1, FMath::Max(soundAmplitude, 0.0) ) );
+					soundRay.ISPosition = node->Position;
+
+					// Sound amplitude is reduced by 6 dB each time distance doubles
+					// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
+					float cumulativeDistance = 0.0f;
+					// Total drop in amplitude due to cumulative distance from source
+					float totalDrop;
+					// Drop in amplitude in last ray point
+					float lastAmplitudeDrop = 0.0f;
+					// Drop in amplitude in this segment of the ray (total - last)
+					float drop;
+					// Amplitude arriving at the ray point 
+					float inAmp;
+
+					for (int i = intersections.Num() - 1; i > 1; i--)
+					{
+						// Adding the cumulative distance from source
+						cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
+						
+						// Total drop in amplitude is log2( totalDistance / initialDistance )
+						// Where initialDistance is the distance of the original amplitude (again, assumed to be 1 meter)
+						totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+						
+						// This is the factor by how much the amplitude drops in this segment of the ray
+						drop = totalDrop - lastAmplitudeDrop;
+						
+						// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
+						inAmp = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude - (drop * 6);
+						inAmp = FMath::Max(inAmp, 0.0);
+						
+						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.90) );
+						
+						lastAmplitudeDrop = totalDrop;
+					}
+
+					// All operations are repeated for the last point
+					cumulativeDistance += (intersections[0] - intersections[1]).Length();
+					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+					drop = totalDrop - lastAmplitudeDrop;
+					inAmp = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude - (drop * 6);
+					inAmp = FMath::Max(inAmp, 0.0);
+					
+					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp,-1) );
+					soundRay.FinalAmplitude = inAmp;
+
+					SoundRaysLock.Lock();
+					SoundRays.AddRay(soundRay);
+					SoundRaysLock.Unlock();
 				}
 				
 				node->Path = TArray(intersections);
@@ -509,7 +629,8 @@ void AIS_Source::DrawDebug()
 	if (drawImageSources)
 	{
 		// Original source
-		DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
+		DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
+		//DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
 
 		// Image Sources
 		if (trees.Num() > 0)
@@ -521,7 +642,8 @@ void AIS_Source::DrawDebug()
 			for (IS* node : trees[listeners[0]].Nodes())
 			{
 				if (node->Valid == true)
-					DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
+					DrawDebugPoint(GetWorld(), FVector(node->Position), 10, FColor::Green, true, -1);
+					//DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
 			}
 		}	
 	}
@@ -529,8 +651,95 @@ void AIS_Source::DrawDebug()
 
 	
 	//Draw all reflections paths in a given order interval
-	if (MinOrder != -1 || MaxOrder != -1)
+	if (MinOrder != -1 && MaxOrder != -1)
 	{
+		// Check if the niagara system is valid
+		if (SoundRayFX->IsValid())
+		{
+			// i iterates on the sound rays
+			int i = 0;
+			// n iterates on the niagara effects
+			int n = 0;
+
+			// For all sound rays
+			for ( ; i < SoundRays.GetNumRays(); i++)
+			{
+				// Ray order equals number of points -2 (source and listener are not reflections)
+				int rayOrder = SoundRays.GetRay(i)->GetNumRayPoints() - 2;
+
+				// Draw the ray if it's in the specified order range
+				if (rayOrder >= MinOrder && rayOrder <= MaxOrder)
+				{
+					UNiagaraComponent* NiagaraComp = nullptr;
+
+					if (NiagaraEffects.Num() > n)
+					{
+						if (NiagaraEffects[n] != nullptr)
+						{
+							NiagaraComp = NiagaraEffects[n];
+						}
+						else
+						{
+							NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+							NiagaraEffects.Insert( NiagaraComp , n );
+						}
+					}
+					else
+					{
+						NiagaraComp = UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SoundRayFX, GetActorLocation(), FRotator(1), FVector(1), false, true);
+						NiagaraEffects.Add( NiagaraComp );	
+					}
+
+					TArray<FVector> Ray = TArray<FVector>();
+					TArray<float> Amplitudes = TArray<float>();
+
+					IS_SoundRay* ray = SoundRays.GetRay(i);
+					IS_SoundRayPoint* point;
+
+					for (int j = 0 ; j < ray->GetNumRayPoints() ; j++)
+					{
+						point = ray->GetRayPoint(j);
+
+						Ray.Add(FVector(point->PointPosition));
+						Amplitudes.Add(point->InAmplitude);
+						Amplitudes.Add(point->OutAmplitude);
+					}
+
+					//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
+
+					if (NiagaraComp != nullptr)
+					{
+						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
+						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);
+						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), Amplitudes[1]);
+						NiagaraComp->Activate(true);
+					}
+
+					n++;
+				}
+			}
+
+			for ( ; n < NiagaraEffects.Num(); n++)
+			{
+				if (NiagaraEffects[n] != nullptr)
+				{
+					NiagaraEffects[n]->DestroyInstance();
+					NiagaraEffects.RemoveAt(n);
+					n--;
+				}
+				else
+				{
+					NiagaraEffects.RemoveAt(n);
+					n--;
+				}
+			}
+		}
+		else
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Warning: the selected Niagara System is not valid, please select IS_SoundRaysFX"));
+		}
+
+		/*
 		if (trees.Num() > 0)
 		{
 			// Getting the first listener (tests should only be performed with one)
@@ -549,6 +758,24 @@ void AIS_Source::DrawDebug()
 
 				if (node->Order > MaxOrder)
 					break;
+			}
+		}
+		*/
+	}
+	else
+	{
+		for ( int n = 0 ; n < NiagaraEffects.Num(); n++)
+		{
+			if (NiagaraEffects[n] != nullptr)
+			{
+				NiagaraEffects[n]->DestroyInstance();
+				NiagaraEffects.RemoveAt(n);
+				n--;
+			}
+			else
+			{
+				NiagaraEffects.RemoveAt(n);
+				n--;
 			}
 		}
 	}
@@ -603,7 +830,8 @@ void AIS_Source::DrawDebug()
 				parentNode = node->Parent;
 
 				// Highlights the IS in red
-				DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
+				DrawDebugPoint(GetWorld(), FVector(node->Position), 15, FColor::Red, true, -1);
+				//DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
 
 				// Draws the resulting beam projection on the reflector
 				for (IS_ReflectorEdge edge : node->BeamPoints.Edges())
@@ -619,7 +847,8 @@ void AIS_Source::DrawDebug()
 
 				// Highlights the parent IS in blue
 				IS* nodeParent = nodes[node->Parent];
-				DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
+				DrawDebugPoint(GetWorld(), FVector(nodeParent->Position), 15, FColor::Blue, true, -1);
+				//DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
 
 				// Draws parent beam points
 				for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
