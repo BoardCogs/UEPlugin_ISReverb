@@ -278,7 +278,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
 					inAmp = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude - (drop * 6);
 					
-					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.95) );
+					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.90) );
 					
 					lastAmplitudeDrop = totalDrop;
 				}
@@ -450,7 +450,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						inAmp = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude - (drop * 6);
 						inAmp = FMath::Max(inAmp, 0.0);
 						
-						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.95) );
+						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],inAmp,inAmp * 0.90) );
 						
 						lastAmplitudeDrop = totalDrop;
 					}
@@ -651,7 +651,7 @@ void AIS_Source::DrawDebug()
 
 	
 	//Draw all reflections paths in a given order interval
-	if (MinOrder != -1 || MaxOrder != -1)
+	if (MinOrder != -1 && MaxOrder != -1)
 	{
 		// Check if the niagara system is valid
 		if (SoundRayFX->IsValid())
@@ -711,6 +711,7 @@ void AIS_Source::DrawDebug()
 					{
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), Amplitudes);
+						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), Amplitudes[1]);
 						NiagaraComp->Activate(true);
 					}
 
@@ -760,6 +761,23 @@ void AIS_Source::DrawDebug()
 			}
 		}
 		*/
+	}
+	else
+	{
+		for ( int n = 0 ; n < NiagaraEffects.Num(); n++)
+		{
+			if (NiagaraEffects[n] != nullptr)
+			{
+				NiagaraEffects[n]->DestroyInstance();
+				NiagaraEffects.RemoveAt(n);
+				n--;
+			}
+			else
+			{
+				NiagaraEffects.RemoveAt(n);
+				n--;
+			}
+		}
 	}
 	
 
