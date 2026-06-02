@@ -32,13 +32,13 @@ public:
 	int ID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float Metallic;
+	float LowFreqsAbsorption;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float Specular;
+	float MedFreqsAbsorption;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float Roughness;
+	float HighFreqsAbsorption;
 
 	// METHODS
 	UFUNCTION(BlueprintCallable)

@@ -85,19 +85,15 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 		true
 		);
 	
-	//Payload.GetBaseColor();
-	//Payload.GetMetallic();
-	//Payload.GetRoughness();
-	//Payload.GetWorldNormal();
-	//Payload.GetBlendingMode();
-	//...
-	
 	float3 HitColor = float3(0.0, 0.0, 0.0);
 	
 	if (Payload.IsHit())
 	{
+		// Red = low freqs
 		HitColor.x = Payload.GetRoughness();
+		// Green = medium freqs
 		HitColor.y = Payload.GetMetallic();
+		// Blue = high freqs
 		HitColor.z = Payload.GetSpecular();
 
 		float shading = 1.0;

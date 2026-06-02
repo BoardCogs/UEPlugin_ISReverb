@@ -662,7 +662,7 @@ void AIS_Source::DrawDebug()
 			int n = 0;
 
 			// For all sound rays
-			for ( ; i < SoundRays.GetNumRays(); i++)
+			for ( ; i < SoundRays.GetNumRays(); i++ )
 			{
 				// Ray order equals number of points -2 (source and listener are not reflections)
 				int rayOrder = SoundRays.GetRay(i)->GetNumRayPoints() - 2;
@@ -696,7 +696,7 @@ void AIS_Source::DrawDebug()
 					IS_SoundRay* ray = SoundRays.GetRay(i);
 					IS_SoundRayPoint* point;
 
-					for (int j = 0 ; j < ray->GetNumRayPoints() ; j++)
+					for ( int j = 0 ; j < ray->GetNumRayPoints() ; j++ )
 					{
 						point = ray->GetRayPoint(j);
 
@@ -719,7 +719,7 @@ void AIS_Source::DrawDebug()
 				}
 			}
 
-			for ( ; n < NiagaraEffects.Num(); n++)
+			for ( ; n < NiagaraEffects.Num(); n++ )
 			{
 				if (NiagaraEffects[n] != nullptr)
 				{
@@ -764,7 +764,7 @@ void AIS_Source::DrawDebug()
 	}
 	else
 	{
-		for ( int n = 0 ; n < NiagaraEffects.Num(); n++)
+		for ( int n = 0 ; n < NiagaraEffects.Num(); n++ )
 		{
 			if (NiagaraEffects[n] != nullptr)
 			{
