@@ -27,8 +27,8 @@ public:
 	// All points along which the sound ray gets reflected, plus source and listener as first and last point respectively
 	TArray<IS_SoundRayPoint> RayPoints;
 
-	// The final amplitude of the reverb reaching the listener
-	float FinalAmplitude;
+	// The final amplitude on three frequency bands of the reverb reaching the listener
+	FVector3f FinalAmplitudes;
 
 	// Position of the IS generating this ray, it corresponds to the position from which the reverb appears to be heard
 	FVector3f ISPosition;

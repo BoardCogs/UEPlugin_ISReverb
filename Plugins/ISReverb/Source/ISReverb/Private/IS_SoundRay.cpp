@@ -8,7 +8,7 @@ IS_SoundRay::IS_SoundRay()
 void IS_SoundRay::Clear()
 {
 	RayPoints.Empty();
-	FinalAmplitude = 0.0;
+	FinalAmplitudes = FVector3f().ZeroVector;
 	ISPosition = FVector3f(0,0,0);
 }
 

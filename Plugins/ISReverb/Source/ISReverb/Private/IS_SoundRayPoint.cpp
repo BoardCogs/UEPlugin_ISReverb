@@ -5,9 +5,13 @@ IS_SoundRayPoint::IS_SoundRayPoint()
 	
 }
 
-IS_SoundRayPoint::IS_SoundRayPoint(FVector3f position, float inAmp, float outAmp)
+IS_SoundRayPoint::IS_SoundRayPoint(FVector3f position, float inAmpLow, float outAmpLow, float inAmpMed, float outAmpMed, float inAmpHigh, float outAmpHigh)
 {
 	PointPosition = position;
-	InAmplitude = inAmp;
-	OutAmplitude = outAmp;
+	InAmplitudeLow = inAmpLow;
+	OutAmplitudeLow = outAmpLow;
+	InAmplitudeMed = inAmpMed;
+	OutAmplitudeMed = outAmpMed;
+	InAmplitudeHigh = inAmpHigh;
+	OutAmplitudeHigh = outAmpHigh;
 }
