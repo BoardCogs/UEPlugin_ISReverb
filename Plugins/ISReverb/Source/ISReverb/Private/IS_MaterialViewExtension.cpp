@@ -18,6 +18,10 @@ static TAutoConsoleVariable<int32> CVarMaterialView(
 		      "Red = Roughness\n"
 		      "Green = Metallic\n"
 		      "Blue = Specular\n"
+		      "The plugins's Reflector Surfaces will instead show their reflection coefficients for sound frequencies.\n"
+			  "Red = Low frequencies\n"
+			  "Green = Medium frequencies\n"
+			  "Blue = High frequencies\n"
 			  "Note: Crash if ray tracing shadows are not enabled.\n"
 			  "0: Off, 1: On"),
 	ECVF_RenderThreadSafe
