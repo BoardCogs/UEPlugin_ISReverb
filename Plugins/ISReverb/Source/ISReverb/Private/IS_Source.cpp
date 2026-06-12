@@ -777,8 +777,8 @@ void AIS_Source::DrawDebug()
 					{
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayPosition(NiagaraComp, FName("Ray"), Ray);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesLow"), AmplitudesLow);
-						//UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), AmplitudesMed);
-						//UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("Amplitudes"), AmplitudesMed);
+						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesMed"), AmplitudesMed);
+						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesHigh"), AmplitudesHigh);
 						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), soundAmplitude);
 						NiagaraComp->Activate(true);
 					}
