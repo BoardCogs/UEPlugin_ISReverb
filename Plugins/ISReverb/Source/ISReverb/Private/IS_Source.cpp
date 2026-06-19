@@ -498,11 +498,21 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						inAmpHigh = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitudeHigh - (drop * 6);
 						inAmpHigh = FMath::Max(inAmpHigh, 0.0);
 
+						// Applying absorption to sound energy
+						float outAmpLow = FMath::Pow(10.0, inAmpLow / 20 - 12.0) * (1.0 - absorptions[i-1].X);
+						outAmpLow = 20 * FMath::LogX(10, outAmpLow / FMath::Pow(10.0, -12.0));
+
+						float outAmpMed = FMath::Pow(10.0, inAmpMed / 20 - 12.0) * (1.0 - absorptions[i-1].Y);
+						outAmpMed = 20 * FMath::LogX(10, outAmpMed / FMath::Pow(10.0, -12.0));
+
+						float outAmpHigh = FMath::Pow(10.0, inAmpHigh / 20 - 12.0) * (1.0 - absorptions[i-1].Z);
+						outAmpHigh = 20 * FMath::LogX(10, outAmpHigh / FMath::Pow(10.0, -12.0));
+
 						// Adding the ray point
 						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
-											  inAmpLow,inAmpLow * (1.0 - absorptions[i-1].X),
-											  inAmpMed,inAmpMed * (1.0 - absorptions[i-1].Y),
-											  inAmpHigh,inAmpHigh * (1.0 - absorptions[i-1].Z))
+											  inAmpLow,outAmpLow,
+											  inAmpMed,outAmpMed,
+											  inAmpHigh,outAmpHigh)
 									);
 						
 						lastAmplitudeDrop = totalDrop;
