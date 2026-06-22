@@ -96,21 +96,21 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 		// Blue = high freqs
 		HitColor.z = Payload.GetSpecular();
 
-		float shading = 1.0;
-		float occlusion = 1.0;
+		float diffuse = 0.5;
+		float ambient = 0.5;
 
 		// Diffuse
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 0))
 		{
-			shading = dot(View.DirectionalLightDirection, Payload.GetWorldNormal());
+			diffuse = dot(View.DirectionalLightDirection, Payload.GetWorldNormal());
 			
-			if (shading >= 0.0)
+			if (diffuse >= 0.0)
 			{
-				shading = shading * 0.4 + 0.6;
+				diffuse = diffuse * 0.5;
 			}
 			else
 			{
-				shading = 0.6;
+				diffuse = 0.0;
 			}
 			
 			//shading = (shading - -1.0) * (1 - 0.5) / (1 - -1.0) + 0.5;
@@ -148,21 +148,30 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 					hitNum += 1.0;
 					//closestRayHitDistance = min(closestRayHitDistance, MinimalPayload.HitT);
 
+					// Linear scaling for occlusion (each intersection has constant occluding factor)
 					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 0)
 					{
-						occlusion -= 0.5 / SamplesPerPixel;	
+						ambient -= 0.5 / SamplesPerPixel;	
+					}
+
+					// Distance based scaling for occlusion
+					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 3)
+					{
+						ambient -= 0.5 / SamplesPerPixel * ( 1 - 1 / MaxRayDistance * MinimalPayload.HitT );
 					}
 				}
 			}
-			
+
+			// Factorial scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 1)
 			{
-				occlusion -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2) * ((hitNum + 1) * hitNum / 2);
+				ambient -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2) * ((hitNum + 1) * hitNum / 2);
 			}
 
+			// Exponential scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 2)
 			{
-				occlusion -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
+				ambient -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
 			}
 			
 			//RWAmbientOcclusionMaskUAV[PixelCoord] = occlusion;
@@ -200,11 +209,11 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				);
 			if (ShadowPayload.IsHit())
 			{
-				shading = 0.6;
+				diffuse = 0.0;
 			}
 		}
 
-		OutputTexture[DispatchRaysIndex().xy] = float4(HitColor * shading * occlusion, 1.0);
+		OutputTexture[DispatchRaysIndex().xy] = float4(HitColor * (diffuse + ambient), 1.0);
 		return;
 	}
 

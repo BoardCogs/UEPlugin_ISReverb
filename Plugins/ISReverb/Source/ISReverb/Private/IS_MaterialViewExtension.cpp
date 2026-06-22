@@ -14,15 +14,13 @@
 static TAutoConsoleVariable<int32> CVarMaterialView(
 	TEXT("r.Raytracing.MaterialView.Enable"),
 	0,
-	TEXT("Enables material properties visualization: all meshes will be rendered with a simple color showcasing roughness, metallic and specular factor.\n"
-		      "Red = Roughness\n"
-		      "Green = Metallic\n"
-		      "Blue = Specular\n"
-		      "The plugins's Reflector Surfaces will instead show their reflection coefficients for sound frequencies.\n"
+	TEXT("Enables material properties visualization: the plugins's Reflector Surfaces will be colored to show their "
+	          "reflection coefficients for sound frequencies, modelled by changing their roughness, metallic and specular factor.\n"
 			  "Red = Low frequencies\n"
 			  "Green = Medium frequencies\n"
 			  "Blue = High frequencies\n"
-			  "Note: Crash if ray tracing shadows are not enabled.\n"
+			  "Note: it's recommended to disable raytracing visibility for all other meshes in the scene, for which "
+	          "the RGB colors will show roughness, metallic and specular components. Will crash if ray tracing shadows are not enabled.\n"
 			  "0: Off, 1: On"),
 	ECVF_RenderThreadSafe
 );
@@ -37,7 +35,7 @@ static TAutoConsoleVariable<int32> CVarMaterialViewDiffuse(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusion(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusion.Enable"),
-	5,
+	1,
 	TEXT("Enables ambient occlusion for the material view.\n"
 			  "0: Off, 1+: Number of samples per pixel"),
 	ECVF_RenderThreadSafe
@@ -53,11 +51,12 @@ static TAutoConsoleVariable<int32> CVarMaterialViewShadow(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusionMode(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusionScaling.Set"),
-	1,
+	3,
 	TEXT("Defines how ambient occlusion scales with number of positive samples.\n"
 			  "0: Linear\n"
 			  "1: Factorial\n"
-			  "2: Exponential"),
+			  "2: Exponential\n"
+			  "3: Distance based"),
 	ECVF_RenderThreadSafe
 );
 
