@@ -90,11 +90,11 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 	if (Payload.IsHit())
 	{
 		// Red = low freqs
-		HitColor.x = Payload.GetRoughness();
+		HitColor.x = log10( 1.0 + 9.0 * Payload.GetRoughness() );
 		// Green = medium freqs
-		HitColor.y = Payload.GetMetallic();
+		HitColor.y = log10( 1.0 + 9.0 * Payload.GetMetallic() );
 		// Blue = high freqs
-		HitColor.z = Payload.GetSpecular();
+		HitColor.z = log10( 1.0 + 9.0 * Payload.GetSpecular() );
 
 		float diffuse = 0.5;
 		float ambient = 0.5;
@@ -112,8 +112,6 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			{
 				diffuse = 0.0;
 			}
-			
-			//shading = (shading - -1.0) * (1 - 0.5) / (1 - -1.0) + 0.5;
 		}
 
 		// Ambient occlusion
@@ -174,13 +172,13 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				ambient -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
 			}
 			
-			//RWAmbientOcclusionMaskUAV[PixelCoord] = occlusion;
+			//RWAmbientOcclusionMaskUAV[PixelCoord] = ambient;
 			//RWAmbientOcclusionHitDistanceUAV[PixelCoord] = closestRayHitDistance == 10000.0 ? -1.0 : closestRayHitDistance;
 		}
 		/*
 		else
 		{
-			RWAmbientOcclusionMaskUAV[PixelCoord] = 1.0;
+			RWAmbientOcclusionMaskUAV[PixelCoord] = 0.0;
 			RWAmbientOcclusionHitDistanceUAV[PixelCoord] = 1.0;	
 		}
 		*/
