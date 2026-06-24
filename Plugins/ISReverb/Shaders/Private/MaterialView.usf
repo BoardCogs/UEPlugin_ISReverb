@@ -32,17 +32,9 @@ void GenerateCosineNormalRay(
 
 	// Perform cosine-hemispherical sampling and convert to world-space
 	float4 Direction_Tangent;
-	#if 1
-	{
-		Direction_Tangent = CosineSampleHemisphereConcentric(RandSample);
-		Direction_Tangent.w = Direction_Tangent.z;
-	}
-	#else
-	{
-		Direction_Tangent = CosineSampleHemisphere(RandSample);
-	}
-	#endif
-
+	Direction_Tangent = CosineSampleHemisphereConcentric(RandSample);
+	Direction_Tangent.w = Direction_Tangent.z;
+	
 	float3 Direction_World = TangentToWorld(Direction_Tangent.xyz, WorldNormal);
 
 	RayOrigin = TranslatedWorldPosition;
@@ -96,8 +88,11 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 		// Blue = high freqs
 		HitColor.z = log10( 1.0 + 9.0 * Payload.GetSpecular() );
 
-		float diffuse = 0.5;
-		float ambient = 0.5;
+		float diffuseMax = 0.6;
+		float ambientMax = 0.4;
+
+		float diffuse = diffuseMax;
+		float ambient = ambientMax;
 
 		// Diffuse
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 0))
@@ -106,7 +101,7 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			
 			if (diffuse >= 0.0)
 			{
-				diffuse = diffuse * 0.5;
+				diffuse = diffuse * diffuseMax;
 			}
 			else
 			{
@@ -146,13 +141,13 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 					// Linear scaling for occlusion (each intersection has constant occluding factor)
 					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 0)
 					{
-						ambient -= 0.5 / SamplesPerPixel;	
+						ambient -= ambientMax / SamplesPerPixel;	
 					}
 
 					// Distance based scaling for occlusion
 					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 3)
 					{
-						ambient -= 0.5 / SamplesPerPixel * ( 1.0 - 1.0 / MaxRayDistance * MinimalPayload.HitT );
+						ambient -= ambientMax / SamplesPerPixel * ( 1.0 - MinimalPayload.HitT / MaxRayDistance );
 					}
 				}
 			}
@@ -160,13 +155,13 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			// Factorial scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 1)
 			{
-				ambient -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2.0) * ((hitNum + 1.0) * hitNum / 2.0);
+				ambient -= ambientMax / ((SamplesPerPixel + 1) * SamplesPerPixel / 2.0) * ((hitNum + 1.0) * hitNum / 2.0);
 			}
 
 			// Exponential scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 2)
 			{
-				ambient -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
+				ambient -= ambientMax / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
 			}
 
 			/*

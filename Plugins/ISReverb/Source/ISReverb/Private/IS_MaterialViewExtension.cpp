@@ -145,7 +145,7 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 			FMaterialViewRG::FParameters* PassParameters = GraphBuilder.AllocParameters<FMaterialViewRG::FParameters>();
 
 			PassParameters->SamplesPerPixel = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
-			PassParameters->MaxRayDistance = View.FinalPostProcessSettings.RayTracingAORadius;
+			PassParameters->MaxRayDistance = View.FinalPostProcessSettings.RayTracingAORadius / 2;
 			//PassParameters->RWAmbientOcclusionMaskUAV = GraphBuilder.CreateUAV(RWAmbientOcclusionMaskRDGTexture);
 			//PassParameters->RWAmbientOcclusionHitDistanceUAV = GraphBuilder.CreateUAV(RWAmbientOcclusionHitDistanceRDGTexture);
 			PassParameters->ViewUniformBuffer = InView.ViewUniformBuffer;
