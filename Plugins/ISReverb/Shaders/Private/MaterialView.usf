@@ -121,8 +121,6 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			float HitT = Payload.HitT;
 			float3 HitWorldPos = PrimaryRay.Origin + (PrimaryRay.Direction * HitT);
 
-			//float closestRayHitDistance = 10000.0;
-
 			uint TimeSeed = View.StateFrameIndex;
 
 			for (uint SampleIndex = 0; SampleIndex < SamplesPerPixel; ++SampleIndex)
@@ -144,7 +142,6 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				if (MinimalPayload.IsHit())
 				{
 					hitNum += 1.0;
-					//closestRayHitDistance = min(closestRayHitDistance, MinimalPayload.HitT);
 
 					// Linear scaling for occlusion (each intersection has constant occluding factor)
 					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 0)
@@ -155,7 +152,7 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 					// Distance based scaling for occlusion
 					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 3)
 					{
-						ambient -= 0.5 / SamplesPerPixel * ( 1 - 1 / MaxRayDistance * MinimalPayload.HitT );
+						ambient -= 0.5 / SamplesPerPixel * ( 1.0 - 1.0 / MaxRayDistance * MinimalPayload.HitT );
 					}
 				}
 			}
@@ -163,7 +160,7 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			// Factorial scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 1)
 			{
-				ambient -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2) * ((hitNum + 1) * hitNum / 2);
+				ambient -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2.0) * ((hitNum + 1.0) * hitNum / 2.0);
 			}
 
 			// Exponential scaling for occlusion (each intersection has increasing occluding factor)
@@ -171,17 +168,45 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			{
 				ambient -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
 			}
+
+			/*
+			RWAmbientOcclusionMaskUAV[PixelCoord] = ambient;
+			RWAmbientOcclusionHitDistanceUAV[PixelCoord] = HitT;
 			
-			//RWAmbientOcclusionMaskUAV[PixelCoord] = ambient;
-			//RWAmbientOcclusionHitDistanceUAV[PixelCoord] = closestRayHitDistance == 10000.0 ? -1.0 : closestRayHitDistance;
+			if (RWAmbientOcclusionHitDistanceUAV[PixelCoord] >= 0)
+			{
+				ambient = 0.0;
+				int2 neighbor;
+				float weight;
+				float weightTotal = 0.0;
+				int filterDimension = 10; 
+				
+				for (int row = -filterDimension; row < filterDimension + 1; ++row)
+				{
+					for (int col = -filterDimension; col < filterDimension + 1; ++col)
+					{
+						neighbor = PixelCoord + int2(row,col);
+						weight = pow( 2 , filterDimension * 2 ) / pow( 2 , abs(row) + abs(col) );
+
+						//RWAmbientOcclusionHitDistanceUAV[PixelCoord] - RWAmbientOcclusionHitDistanceUAV[neighbor] < 1
+						
+						if (RWAmbientOcclusionHitDistanceUAV[neighbor] >= 0)
+						{
+							if (RWAmbientOcclusionMaskUAV[neighbor] <= 0.5 && RWAmbientOcclusionMaskUAV[neighbor] >= 0.0)
+							{
+								ambient += RWAmbientOcclusionMaskUAV[neighbor] * weight;
+								weightTotal += weight;
+							}
+						}
+					}
+				}
+				
+				ambient = ambient / weightTotal;
+				RWAmbientOcclusionMaskUAV[PixelCoord] = ambient;	
+			}
+			*/
+			
 		}
-		/*
-		else
-		{
-			RWAmbientOcclusionMaskUAV[PixelCoord] = 0.0;
-			RWAmbientOcclusionHitDistanceUAV[PixelCoord] = 1.0;	
-		}
-		*/
 		
 		// Shadow
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 2))
