@@ -27,7 +27,6 @@ void GenerateCosineNormalRay(
 )
 {
 	// Draw random variable
-	float2 BufferSize = View.BufferSizeAndInvSize.xy;
 	float2 RandSample = RandomSequence_GenerateSample2D(RandSequence);
 
 	// Perform cosine-hemispherical sampling and convert to world-space
@@ -39,7 +38,7 @@ void GenerateCosineNormalRay(
 
 	RayOrigin = TranslatedWorldPosition;
 	RayDirection = Direction_World;
-	RayTMin = 1.0;
+	RayTMin = 0.5;
 	RayTMax = MaxRayDistance;
 }
 

@@ -34,7 +34,7 @@ static TAutoConsoleVariable<int32> CVarMaterialViewDiffuse(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusion(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusion.Enable"),
-	1,
+	2,
 	TEXT("Enables ambient occlusion for the material view.\n"
 			  "0: Off, 1+: Number of samples per pixel"),
 	ECVF_RenderThreadSafe
