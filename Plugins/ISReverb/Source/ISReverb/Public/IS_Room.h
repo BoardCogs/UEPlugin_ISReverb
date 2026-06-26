@@ -31,7 +31,7 @@ public:
 	FString Name;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool SurfacesVisibleInGame = false;
+	bool VisibleSurfaces = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<AIS_ReflectorSurface*> Surfaces;
