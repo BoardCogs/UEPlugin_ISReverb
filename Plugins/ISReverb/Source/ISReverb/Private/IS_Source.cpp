@@ -41,8 +41,6 @@ void AIS_Source::GenerateISs()
 		else
 		{
 			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source are in separate rooms"));
-
-			// TODO: Set the source position after path finding
 			position = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
 		}
 
@@ -63,7 +61,7 @@ void AIS_Source::GenerateISs()
 void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 {
 	// Generates ISTree and adds it to the array
-	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
+	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
 	trees.Add(listener, tree);
 
 	// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
@@ -113,7 +111,7 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f 
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, position, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, debugBeamTracing);
+		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
 		Promise->SetValue(tree);
 	});
 

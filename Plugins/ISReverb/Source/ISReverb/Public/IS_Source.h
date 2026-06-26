@@ -86,6 +86,10 @@ public:
     UPROPERTY(EditAnywhere)
     bool BeamClipping = true;
 
+    /* Projections with less are than this are discarded, set to <=0 to disable */
+    UPROPERTY(EditAnywhere)
+    float CutArea = 1000;
+
     //[Header("Visualize")]
 
     /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */

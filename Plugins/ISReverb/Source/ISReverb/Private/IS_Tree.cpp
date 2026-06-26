@@ -2,7 +2,7 @@
 
 
 
-IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
+IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, float cutArea, bool debugBeamTracing)
 {
     if (r == 0)
         return;
@@ -14,6 +14,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     _wrongSideOfReflector = wrongSideOfReflector;
     _beamTracing = beamTracing;
     _beamClipping = beamClipping;
+    _cutArea = cutArea;
     _debugBeamTracing = debugBeamTracing;
 
     FDateTime StartTime = FDateTime::UtcNow();
@@ -413,7 +414,15 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         }
     }
 
+    
+    // Projection area check
+    if (_cutArea > 0)
+    {
+        if (ComputePolygonArea(&beam) < _cutArea)
+            return false;
+    }
 
+    
     nodesLock.Lock();
     
     // IS is created and its position is given
@@ -494,6 +503,25 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
         // The line and plane are parallel (no intersection)
         return false;
     }
+}
+
+
+
+float IS_Tree::ComputePolygonArea(IS_BeamProjection* beam)
+{
+    float area = 0.0;
+
+    FVector3f pointC = beam->Points()[0];
+    
+    for (IS_ReflectorEdge e : beam->Edges())
+    {
+        if (e.PointA != pointC && e.PointB != pointC)
+        {
+            area += FVector3f::CrossProduct(e.PointA - pointC, e.PointB - pointC).Length() / 2;
+        }
+    }
+    
+    return area;
 }
 
 

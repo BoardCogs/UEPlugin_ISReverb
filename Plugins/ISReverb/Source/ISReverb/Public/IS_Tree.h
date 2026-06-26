@@ -17,7 +17,7 @@ public:
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
+    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, float cutArea, bool debugBeamTracing);
 
 private:
 	// PROPERTIES
@@ -45,6 +45,9 @@ private:
     // Wheter to optimize by projecting the beam from an IS only using the portion of reflector that fell inside the beam of the parent IS
     bool _beamClipping;
 
+	// Projections with less are than this are discarded
+	float _cutArea;
+
     // Amount of ISs saved by using beam tracing and clipping
     int _beam = 0;
 
@@ -68,6 +71,9 @@ private:
 
     // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points
     bool CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points);
+
+	// Given the points of a convex polygon, computes its area
+	float ComputePolygonArea(IS_BeamProjection* beam);
 
 public:
 	// PROPERTIES
