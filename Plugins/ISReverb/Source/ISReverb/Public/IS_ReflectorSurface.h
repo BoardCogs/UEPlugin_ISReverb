@@ -31,6 +31,9 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool Visible = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
 	float LowFreqsAbsorption;
 

@@ -81,11 +81,14 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 	if (Payload.IsHit())
 	{
 		// Red = low freqs
-		HitColor.x = log10( 1.0 + 9.0 * Payload.GetRoughness() );
+		HitColor.x = (pow(10, Payload.GetRoughness()) -1) / 9;
+		//HitColor.x = log10( 1.0 + 9.0 * Payload.GetRoughness() );
 		// Green = medium freqs
-		HitColor.y = log10( 1.0 + 9.0 * Payload.GetMetallic() );
+		HitColor.y = (pow(10, Payload.GetMetallic()) -1) / 9;
+		//HitColor.y = log10( 1.0 + 9.0 * Payload.GetMetallic() );
 		// Blue = high freqs
-		HitColor.z = log10( 1.0 + 9.0 * Payload.GetSpecular() );
+		HitColor.z = (pow(10, Payload.GetSpecular()) -1) / 9;
+		//HitColor.z = log10( 1.0 + 9.0 * Payload.GetSpecular() );
 
 		float diffuseMax = 0.6;
 		float ambientMax = 0.4;
