@@ -640,7 +640,7 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 	// Getting the name of the changed variable
 	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
 	
-	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths")
+	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths" || MemberPropertyName == "playSound")
 	{
 		if (GetWorld()->WorldType != EWorldType::Editor)
 		{
@@ -657,6 +657,13 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 				generateReflectionPaths = false;
 				GenerateAllReflectionPaths();
 			}
+
+			if (playSound == true)
+			{
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Playing sound"));
+				playSound = false;
+				PlaySound();
+			}
 		}
 		else
 		{
@@ -664,6 +671,7 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Not in editor mode please!"));
 			generateImageSources = false;
 			generateReflectionPaths = false;
+			playSound = false;
 		}
 	}
 
@@ -683,6 +691,41 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 	 * If you don't trust me, try removing the first three and last two lines of code and watch how nothing works
 	 * when trying to call these functions from the edit page.
 	*/
+}
+
+
+
+void AIS_Source::PlaySound()
+{
+	if (SoundEmitter != nullptr)
+	{
+		// Getting the first listener (tests should only be performed with one)
+		/*
+		TArray<AIS_Listener*> listeners;
+		trees.GetKeys(listeners);
+    	FVector3d ListenerPosition = listeners[0]->GetTransform().GetLocation();
+    	*/
+
+		/*
+		for (IS_SoundRay ray : SoundRays.SoundRays)
+		{
+			
+		}
+		*/
+
+		UAudioComponent* AudioComp = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(this->GetTransform().GetLocation()), FRotator(this->GetTransform().GetRotation()), 1, 1, 0, SoundAttenuation );
+		
+		if (AudioComp)
+		{
+			AudioComp->SetFloatParameter(TEXT("Delay"), 1);
+			AudioComp->SetFloatParameter(TEXT("Reflection125"), 0);
+			AudioComp->SetFloatParameter(TEXT("Reflection250"), 0);
+			AudioComp->SetFloatParameter(TEXT("Reflection500"), 0);
+			AudioComp->SetFloatParameter(TEXT("Reflection1000"), 0);
+			AudioComp->SetFloatParameter(TEXT("Reflection2000"), 1);
+			AudioComp->SetFloatParameter(TEXT("Reflection4000"), 1);
+		}
+	}
 }
 
 

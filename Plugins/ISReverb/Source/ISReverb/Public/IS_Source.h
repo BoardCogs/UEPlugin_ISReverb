@@ -4,6 +4,8 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraDataInterfaceArrayFunctionLibrary.h"
 #include "NiagaraComponent.h"
+#include "MetasoundSource.h"
+#include "Components/AudioComponent.h"
 #include "IS_Tree.h"
 #include "IS_Listener.h"
 #include "IS_RoomTracker.h"
@@ -48,6 +50,14 @@ public:
     UPROPERTY(EditAnywhere)
     UNiagaraSystem* SoundRayFX;
 
+    /* The MateSound used to spawn audio */
+    UPROPERTY(EditAnywhere)
+    UMetaSoundSource* SoundEmitter;
+
+    /* The audio attenuation settings */
+    UPROPERTY(EditAnywhere)
+    USoundAttenuation* SoundAttenuation;
+
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
@@ -59,6 +69,10 @@ public:
     /* Set to true to activate path generation and checking (only in play mode) */
     UPROPERTY(EditAnywhere)
     bool generateReflectionPaths = false;
+
+    /* Set to true to play sound from source (only in play mode) */
+    UPROPERTY(EditAnywhere)
+    bool playSound = false;
 
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
@@ -170,6 +184,10 @@ public:
 
     // Returns true if two TArrays of room pointers have at least one room in common
     static bool RoomsInCommon(TArray<AIS_Room*> a, TArray<AIS_Room*> b);
+
+
+
+    void PlaySound();
     
 
 protected:
