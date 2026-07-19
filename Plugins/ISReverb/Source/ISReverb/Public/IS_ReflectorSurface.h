@@ -34,14 +34,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool Visible = false;
 
+	/* 125 Hz absorption coefficient */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float LowFreqsAbsorption;
+	float Absorption125;
 
+	/* 250 Hz absorption coefficient */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float MedFreqsAbsorption;
+	float Absorption250;
 
+	/* 500 Hz absorption coefficient */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
-	float HighFreqsAbsorption;
+	float Absorption500;
+
+	/* 1000 Hz absorption coefficient */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float Absorption1000;
+
+	/* 2000 Hz absorption coefficient */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float Absorption2000;
+
+	/* 4000 Hz absorption coefficient */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))
+	float Absorption4000;
+	
 
 	// METHODS
 	UFUNCTION(BlueprintCallable)
