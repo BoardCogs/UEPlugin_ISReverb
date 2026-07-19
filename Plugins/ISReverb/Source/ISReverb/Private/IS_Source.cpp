@@ -548,8 +548,6 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						
 						// This is the factor by how much the amplitude drops in this segment of the ray
 						drop = totalDrop - lastAmplitudeDrop;
-
-						// TODO: sei frequenze e copia questa parte per generare il primo suono
 						
 						// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
 						inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude125 - (drop * 6);
@@ -798,15 +796,15 @@ void AIS_Source::PlaySound()
 		// Getting the first listener (tests should only be performed with one)
 		TArray<AIS_Listener*> listeners;
 		trees.GetKeys(listeners);
-    	FVector3d ListenerPosition = listeners[0]->GetTransform().GetLocation();
+    	FVector3f ListenerPosition = FVector3f(listeners[0]->GetTransform().GetLocation());
 
-		UAudioComponent* AudioComp = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(this->GetTransform().GetLocation()), FRotator(this->GetTransform().GetRotation()), 1, 1, 0, SoundAttenuation );
-
-		// TODO fai roba
-		if (AudioComp)
+		// Spawning the original sound
+		UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(this->GetTransform().GetLocation()), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
+		
+		if (OriginalAudio)
 		{
 			// Distance between source and listener
-			float distance = (this->GetTransform().GetLocation() - ListenerPosition).Length();
+			float distance = (FVector3f(this->GetTransform().GetLocation()) - ListenerPosition).Length();
 			// Distance in logarithmic scale
 			float drop = FMath::Log2( FMath::Max(distance, 100) / 100);
 			// Amplitude of the original sound is reduced by the drop due to distance from listener, roughly -6 dB each time distance doubles
@@ -814,22 +812,31 @@ void AIS_Source::PlaySound()
 			// Amplitude normalized in [0,1] range
 			float normalizedAmp = amp / soundAmplitude;
 			
-			AudioComp->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
-			AudioComp->SetFloatParameter(TEXT("Reflection125"), normalizedAmp);
-			AudioComp->SetFloatParameter(TEXT("Reflection250"), normalizedAmp);
-			AudioComp->SetFloatParameter(TEXT("Reflection500"), normalizedAmp);
-			AudioComp->SetFloatParameter(TEXT("Reflection1000"), normalizedAmp);
-			AudioComp->SetFloatParameter(TEXT("Reflection2000"), normalizedAmp);
-			AudioComp->SetFloatParameter(TEXT("Reflection4000"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
+			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection500"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection1000"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection2000"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection4000"), normalizedAmp);
 		}
 		
-		// TODO fai roba
-		/*
+		// Spawning reverb audio
 		for (IS_SoundRay ray : SoundRays.SoundRays)
 		{
-			
+			UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(ray.ISPosition), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
+		
+			if (ReverbAudio)
+			{
+				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
+				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalAmplitudes1.X / soundAmplitude);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalAmplitudes1.Y / soundAmplitude);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalAmplitudes1.Z / soundAmplitude);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalAmplitudes2.X / soundAmplitude);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalAmplitudes2.Y / soundAmplitude);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalAmplitudes2.Z / soundAmplitude);
+			}
 		}
-		*/
 	}
 }
 
