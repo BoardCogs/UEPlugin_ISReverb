@@ -35,6 +35,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     FCriticalSection noDoubleLock;
     FCriticalSection wrongSideLock;
     FCriticalSection beamLock;
+    FCriticalSection areaLock;
     FCriticalSection realISsLock;
     
     // Creating all ISs from second order onward
@@ -60,7 +61,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
                 {
-                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, beamLock, realISsLock) )
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, beamLock, areaLock, realISsLock) )
                     {
                         iLock.Lock();
                         i++;
@@ -82,14 +83,15 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
                                   "Optimizations:\n"
                                   " - No reflection on same surface twice in a row: %i ISs removed\n"
                                   " - Wrong side of reflector: %i ISs removed\n"
-                                  " - Beam tracing%hs: %i ISs removed"),
-                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, (_beamClipping ? " + clipping" : ""), _beam);
+                                  " - Beam tracing%hs: %i ISs removed\n"
+                                  " - Cut area: %i ISs removed"),
+                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, (_beamClipping ? " + clipping" : ""), _beam, _area);
 }
 
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
+bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock)
 {
     nodesLock.Lock();
     IS* parentNode = &_nodes[parent];
@@ -414,12 +416,19 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         }
     }
 
-    
+
+    // 4
     // Projection area check
     if (_cutArea > 0)
     {
         if (ComputePolygonArea(&beam) < _cutArea)
-            return false;
+        {
+            areaLock.Lock();
+            _area++;
+            areaLock.Unlock();
+            
+            return false;   
+        }
     }
 
     

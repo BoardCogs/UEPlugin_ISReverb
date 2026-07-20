@@ -45,11 +45,14 @@ private:
     // Wheter to optimize by projecting the beam from an IS only using the portion of reflector that fell inside the beam of the parent IS
     bool _beamClipping;
 
+    // Amount of ISs saved by using beam tracing and clipping
+    int _beam = 0;
+
 	// Projections with less are than this are discarded
 	float _cutArea;
 
-    // Amount of ISs saved by using beam tracing and clipping
-    int _beam = 0;
+	// Amount of ISs saved by cutting beams with areas smaller than the specified threshold
+	int _area = 0;
 
     // In case of debug, this counter stores the actual number of active ISs created
     int _realISs = 0;
@@ -64,7 +67,7 @@ private:
     TArray<AIS_ReflectorSurface*> Surfaces();
 
     // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock);
+    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock);
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
     TArray<FVector3f> CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection);
