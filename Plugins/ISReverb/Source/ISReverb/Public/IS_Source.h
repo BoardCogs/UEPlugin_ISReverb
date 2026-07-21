@@ -37,6 +37,12 @@ private:
 
     TArray<UNiagaraComponent*> NiagaraEffects;
 
+    float timer;
+
+    FVector3f LastSourcePos;
+
+    FVector3f LastListenerPos;
+
 public:
     /* The room(s) the source is currently in */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -58,6 +64,10 @@ public:
     UPROPERTY(EditAnywhere)
     USoundAttenuation* SoundAttenuation;
 
+    /* The audio to be played */
+    UPROPERTY(EditAnywhere)
+    USoundWave* SoundWave;
+
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
@@ -77,6 +87,10 @@ public:
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
     int order;
+
+    /* The distance after which ISs or ray paths are recomputed */
+    UPROPERTY(EditAnywhere)
+    int recomputeDistance = 150;
 
     /* Sound amplitude at 1 meter from source, in dB */
     UPROPERTY(EditAnywhere)
@@ -143,6 +157,8 @@ public:
 protected:
     // Called when the game starts or when spawned
     virtual void BeginPlay() override;
+
+    virtual void Tick(float DeltaSeconds) override;
 
     // Called upon changes made in the editor.
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;

@@ -5,8 +5,8 @@
 // Sets default values
 AIS_Source::AIS_Source()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = false;
+	// Set this actor to call Tick() every frame. You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = true;
 }
 
 
@@ -14,6 +14,36 @@ AIS_Source::AIS_Source()
 void AIS_Source::BeginPlay()
 {
 	Super::BeginPlay();
+}
+
+
+
+void AIS_Source::Tick(float DeltaSeconds)
+{
+	timer += DeltaSeconds;
+
+	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > recomputeDistance )
+	{
+		GenerateISs();
+	}
+	else
+	{
+		if (trees.IsEmpty()) {}
+		else
+		{
+			for (TPair<AIS_Listener*, IS_Tree>& pair : trees)
+			{
+				if ( (FVector3f(pair.Key->GetTransform().GetLocation()) - LastListenerPos).Length() > recomputeDistance )
+					GenerateRP(pair.Key);
+			}
+		}
+	}
+		
+	if (timer >= 2)
+	{
+		timer = 0;
+		PlaySound();
+	}
 }
 
 
@@ -43,6 +73,8 @@ void AIS_Source::GenerateISs()
 			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source are in separate rooms"));
 			position = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
 		}
+
+		LastSourcePos = FVector3f(this->GetTransform().GetLocation());
 
 		// Generate tree
 		if (EnableMultithreading)
@@ -84,7 +116,7 @@ void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 
 void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 {
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async IS generation"));
+	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async IS generation"));
 
 	CreateISTreeTask(listener, position)
 		.Next([this, listener](const IS_Tree& tree)
@@ -95,7 +127,7 @@ void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 				trees.Add(listener, tree);
 				treesLock.Unlock();
 				
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
 
 				GenerateRP(listener);
 			});
@@ -135,6 +167,7 @@ void AIS_Source::GenerateAllReflectionPaths()
 
 void AIS_Source::GenerateRP(AIS_Listener* listener)
 {
+	LastListenerPos = FVector3f(listener->GetTransform().GetLocation());
 	
 	if (EnableMultithreading)
 	{
@@ -397,7 +430,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 	
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener]()
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
 		
 		FDateTime StartTime = FDateTime::UtcNow();
 	
@@ -642,7 +675,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 		{
 			int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
 
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
 			
 			UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
 										  "%i ISs with a valid path out of %i total ISs"),
@@ -799,7 +832,7 @@ void AIS_Source::PlaySound()
     	FVector3f ListenerPosition = FVector3f(listeners[0]->GetTransform().GetLocation());
 
 		// Spawning the original sound
-		UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(this->GetTransform().GetLocation()), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
+		UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
 		
 		if (OriginalAudio)
 		{
@@ -811,7 +844,8 @@ void AIS_Source::PlaySound()
 			float amp = FMath::Max( soundAmplitude - (drop * 6) , 0.0 );
 			// Amplitude normalized in [0,1] range
 			float normalizedAmp = amp / soundAmplitude;
-			
+
+			OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
 			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
 			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), normalizedAmp);
 			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), normalizedAmp);
@@ -824,10 +858,16 @@ void AIS_Source::PlaySound()
 		// Spawning reverb audio
 		for (IS_SoundRay ray : SoundRays.SoundRays)
 		{
+			if (ray.FinalAmplitudes1.X / soundAmplitude < 0.01 && ray.FinalAmplitudes1.Y / soundAmplitude < 0.01 && ray.FinalAmplitudes1.Z / soundAmplitude < 0.01 && ray.FinalAmplitudes2.X / soundAmplitude < 0.01 && ray.FinalAmplitudes2.Y / soundAmplitude < 0.01 && ray.FinalAmplitudes2.Z / soundAmplitude < 0.01)
+			{
+				continue;
+			}
+			
 			UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(ray.ISPosition), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
 		
 			if (ReverbAudio)
 			{
+				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
 				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
 				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalAmplitudes1.X / soundAmplitude);
 				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalAmplitudes1.Y / soundAmplitude);
