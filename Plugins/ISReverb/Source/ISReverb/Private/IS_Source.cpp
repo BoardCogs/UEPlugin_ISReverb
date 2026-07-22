@@ -218,7 +218,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 	TArray<IS*> nodes = trees[listener].Nodes();
 
-	SoundRays.Empty();
+	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
+	SoundRaysBackBuffer->Empty();
+	
 	IS_SoundRay soundRay = IS_SoundRay();
 
 	int validPaths = 0;
@@ -435,7 +437,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 				soundRay.FinalAmplitudes1 = FVector3f(inAmp125,inAmp250,inAmp500);
 				soundRay.FinalAmplitudes2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
-				SoundRays.AddRay(soundRay);
+				SoundRaysBackBuffer->AddRay(soundRay);
 			}
 			
 			node->Path = TArray(intersections);
@@ -447,6 +449,8 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 	UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
 								  "%i ISs with a valid path out of %i total ISs"),
 								  TimeElapsedInMs, validPaths, nodes.Num());
+
+	currentFrontBufferIs1 = !currentFrontBufferIs1;
 								  
 	DrawDebug();
 
@@ -458,9 +462,10 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 {
-	SoundRays.Empty();
+	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
+	SoundRaysBackBuffer->Empty();
 	
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener]()
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, SoundRaysBackBuffer]()
 	{
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
 		
@@ -693,7 +698,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 					soundRay.FinalAmplitudes2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
 					SoundRaysLock.Lock();
-					SoundRays.AddRay(soundRay);
+					SoundRaysBackBuffer->AddRay(soundRay);
 					SoundRaysLock.Unlock();
 				}
 				
@@ -713,6 +718,8 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 										  "%i ISs with a valid path out of %i total ISs"),
 										  TimeElapsedInMs, validISs, totalISs);
 
+			currentFrontBufferIs1 = !currentFrontBufferIs1;
+			
 			DrawDebug();
 
 			// Set state to not currently executing
@@ -889,9 +896,12 @@ void AIS_Source::PlaySound()
 			OriginalAudio->SetFloatParameter(TEXT("Reflection2000"), normalizedAmp);
 			OriginalAudio->SetFloatParameter(TEXT("Reflection4000"), normalizedAmp);
 		}
+
+		// Getting the front sound ray buffer
+		IS_SoundRayArray* SoundRaysFrontBuffer = GetFrontSoundRayBuffer();
 		
 		// Spawning reverb audio
-		for (IS_SoundRay ray : SoundRays.SoundRays)
+		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 		{
 			if (ray.FinalAmplitudes1.X / soundAmplitude < 0.01 && ray.FinalAmplitudes1.Y / soundAmplitude < 0.01 && ray.FinalAmplitudes1.Z / soundAmplitude < 0.01 && ray.FinalAmplitudes2.X / soundAmplitude < 0.01 && ray.FinalAmplitudes2.Y / soundAmplitude < 0.01 && ray.FinalAmplitudes2.Z / soundAmplitude < 0.01)
 			{
@@ -959,11 +969,14 @@ void AIS_Source::DrawDebug()
 			// n iterates on the niagara effects
 			int n = 0;
 
+			// Getting the front sound ray buffer
+			IS_SoundRayArray* SoundRaysFrontBuffer = GetFrontSoundRayBuffer();
+
 			// For all sound rays
-			for ( ; i < SoundRays.GetNumRays(); i++ )
+			for ( ; i < SoundRaysFrontBuffer->GetNumRays(); i++ )
 			{
 				// Ray order equals number of points -2 (source and listener are not reflections)
-				int rayOrder = SoundRays.GetRay(i)->GetNumRayPoints() - 2;
+				int rayOrder = SoundRaysFrontBuffer->GetRay(i)->GetNumRayPoints() - 2;
 
 				// Draw the ray if it's in the specified order range
 				if (rayOrder >= MinOrder && rayOrder <= MaxOrder)
@@ -993,7 +1006,7 @@ void AIS_Source::DrawDebug()
 					TArray<float> AmplitudesMed = TArray<float>();
 					TArray<float> AmplitudesHigh = TArray<float>();
 
-					IS_SoundRay* ray = SoundRays.GetRay(i);
+					IS_SoundRay* ray = SoundRaysFrontBuffer->GetRay(i);
 					IS_SoundRayPoint* point;
 
 					for ( int j = 0 ; j < ray->GetNumRayPoints() ; j++ )
@@ -1208,4 +1221,24 @@ void AIS_Source::DrawDebug()
 			}
 		}
 	}
+}
+
+
+
+IS_SoundRayArray* AIS_Source::GetFrontSoundRayBuffer()
+{
+	if (currentFrontBufferIs1)
+		return &SoundRaysBuffer1;
+	else
+		return &SoundRaysBuffer2;
+}
+
+
+
+IS_SoundRayArray* AIS_Source::GetBackSoundRayBuffer()
+{
+	if (currentFrontBufferIs1)
+		return &SoundRaysBuffer2;
+	else
+		return &SoundRaysBuffer1;
 }

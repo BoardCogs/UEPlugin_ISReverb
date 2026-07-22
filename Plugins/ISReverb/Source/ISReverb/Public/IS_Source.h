@@ -33,12 +33,18 @@ private:
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, IS_Tree> trees;
 
-    // Buffer containing all simulated sound rays
-    IS_SoundRayArray SoundRays = IS_SoundRayArray();
+    // First buffer containing all simulated sound rays
+    // If currentBuffer1 = true, it's the front buffer
+    IS_SoundRayArray SoundRaysBuffer1 = IS_SoundRayArray();
 
-    //IS_SoundRayArray SoundRaysBuffer2 = IS_SoundRayArray();
+    // Second buffer containing all simulated sound rays
+    // If currentBuffer1 = false, it's the front buffer
+    IS_SoundRayArray SoundRaysBuffer2 = IS_SoundRayArray();
 
-    //bool currentBuffer;
+    // Identifies front buffer and back buffer
+    // The front buffer is the one with the most recent sound rays, switched to back buffer when the other is fully updated
+    // The back buffer is the one filled when updating, before switching it to front buffer upon completion
+    bool currentFrontBufferIs1 = false;
 
     // Array with all used Niagara effects
     TArray<UNiagaraComponent*> NiagaraEffects;
@@ -206,6 +212,12 @@ private:
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)
     void DrawDebug();
+
+    // Returns a pointer to the front sound ray buffer
+    IS_SoundRayArray* GetFrontSoundRayBuffer();
+
+    // Returns a pointer to the back sound ray buffer
+    IS_SoundRayArray* GetBackSoundRayBuffer();
     
 
 
