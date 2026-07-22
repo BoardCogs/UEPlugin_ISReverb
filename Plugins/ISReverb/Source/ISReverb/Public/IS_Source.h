@@ -33,15 +33,33 @@ private:
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, IS_Tree> trees;
 
+    // Buffer containing all simulated sound rays
     IS_SoundRayArray SoundRays = IS_SoundRayArray();
 
+    //IS_SoundRayArray SoundRaysBuffer2 = IS_SoundRayArray();
+
+    //bool currentBuffer;
+
+    // Array with all used Niagara effects
     TArray<UNiagaraComponent*> NiagaraEffects;
 
+    // Timer since last sound played
     float timer;
 
+    // Last source position for IS generation
     FVector3f LastSourcePos;
 
+    // Last listener position for RP generation
     FVector3f LastListenerPos;
+
+    // State of execution, true if either IS or RP generation is running
+    bool currentlyExecuting = false;
+
+    // Wether IS generation is cued to start as soon as the current operation finishes 
+    bool cueISGeneration = false;
+
+    // Wether RP generation is cued to start as soon as the current operation finishes
+    bool cueRPGeneration = false;
 
 public:
     /* The room(s) the source is currently in */

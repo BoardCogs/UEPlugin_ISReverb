@@ -22,9 +22,20 @@ void AIS_Source::Tick(float DeltaSeconds)
 {
 	timer += DeltaSeconds;
 
-	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > recomputeDistance )
+	// Recomputing
+	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > recomputeDistance || cueISGeneration )
 	{
-		GenerateISs();
+		if (!currentlyExecuting)
+		{
+			cueISGeneration = false;
+			cueRPGeneration = false;
+			
+			GenerateISs();
+		}
+		else
+		{
+			cueISGeneration = true;
+		}
 	}
 	else
 	{
@@ -33,12 +44,24 @@ void AIS_Source::Tick(float DeltaSeconds)
 		{
 			for (TPair<AIS_Listener*, IS_Tree>& pair : trees)
 			{
-				if ( (FVector3f(pair.Key->GetTransform().GetLocation()) - LastListenerPos).Length() > recomputeDistance )
-					GenerateRP(pair.Key);
+				if ( (FVector3f(pair.Key->GetTransform().GetLocation()) - LastListenerPos).Length() > recomputeDistance || cueRPGeneration )
+				{
+					if (!currentlyExecuting)
+					{
+						cueRPGeneration = false;
+						
+						GenerateRP(pair.Key);
+					}
+					else
+					{
+						cueRPGeneration = true;
+					}
+				}
 			}
 		}
 	}
-		
+
+	// Playing sound regularly
 	if (timer >= 2)
 	{
 		timer = 0;
@@ -92,6 +115,9 @@ void AIS_Source::GenerateISs()
 
 void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 {
+	// Set state to currently executing
+	currentlyExecuting = true;
+	
 	// Generates ISTree and adds it to the array
 	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
 	trees.Add(listener, tree);
@@ -117,6 +143,9 @@ void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
 {
 	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async IS generation"));
+
+	// Set state to currently executing
+	currentlyExecuting = true;
 
 	CreateISTreeTask(listener, position)
 		.Next([this, listener](const IS_Tree& tree)
@@ -420,6 +449,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 								  TimeElapsedInMs, validPaths, nodes.Num());
 								  
 	DrawDebug();
+
+	// Set state to not currently executing
+	currentlyExecuting = false;
 }
 
 
@@ -682,6 +714,9 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 										  TimeElapsedInMs, validISs, totalISs);
 
 			DrawDebug();
+
+			// Set state to not currently executing
+			currentlyExecuting = false;
 		});
 	});
 }
