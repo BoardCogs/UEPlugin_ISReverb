@@ -381,23 +381,23 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					inAmp4000 = FMath::Max(inAmp4000, 0.0);
 
 					// Applying absorption to sound energy
-					float outAmp125 = FMath::Pow(10.0, inAmp125 / 20 - 12.0) * (1.0 - absorptions1[i-1].X);
-					outAmp125 = 20 * FMath::LogX(10, outAmp125 / FMath::Pow(10.0, -12.0));
+					float outAmp125 = 20 * FMath::Pow(10.0, inAmp125 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].X);
+					outAmp125 = 20 * FMath::LogX(10, outAmp125 / (20 * FMath::Pow(10.0, -6.0)) );
 
-					float outAmp250 = FMath::Pow(10.0, inAmp250 / 20 - 12.0) * (1.0 - absorptions1[i-1].Y);
-					outAmp250 = 20 * FMath::LogX(10, outAmp250 / FMath::Pow(10.0, -12.0));
+					float outAmp250 = 20 * FMath::Pow(10.0, inAmp250 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Y);
+					outAmp250 = 20 * FMath::LogX(10, outAmp250 / (20 * FMath::Pow(10.0, -6.0)) );
 
-					float outAmp500 = FMath::Pow(10.0, inAmp500 / 20 - 12.0) * (1.0 - absorptions1[i-1].Z);
-					outAmp500 = 20 * FMath::LogX(10, outAmp500 / FMath::Pow(10.0, -12.0));
+					float outAmp500 = 20 * FMath::Pow(10.0, inAmp500 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Z);
+					outAmp500 = 20 * FMath::LogX(10, outAmp500 / (20 * FMath::Pow(10.0, -6.0)) );
 
-					float outAmp1000 = FMath::Pow(10.0, inAmp1000 / 20 - 12.0) * (1.0 - absorptions2[i-1].X);
-					outAmp1000 = 20 * FMath::LogX(10, outAmp1000 / FMath::Pow(10.0, -12.0));
+					float outAmp1000 = 20 * FMath::Pow(10.0, inAmp1000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].X);
+					outAmp1000 = 20 * FMath::LogX(10, outAmp1000 / (20 * FMath::Pow(10.0, -6.0)) );
 
-					float outAmp2000 = FMath::Pow(10.0, inAmp2000 / 20 - 12.0) * (1.0 - absorptions2[i-1].Y);
-					outAmp2000 = 20 * FMath::LogX(10, outAmp2000 / FMath::Pow(10.0, -12.0));
+					float outAmp2000 = 20 * FMath::Pow(10.0, inAmp2000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Y);
+					outAmp2000 = 20 * FMath::LogX(10, outAmp2000 / (20 * FMath::Pow(10.0, -6.0)) );
 
-					float outAmp4000 = FMath::Pow(10.0, inAmp4000 / 20 - 12.0) * (1.0 - absorptions2[i-1].Z);
-					outAmp4000 = 20 * FMath::LogX(10, outAmp4000 / FMath::Pow(10.0, -12.0));
+					float outAmp4000 = 20 * FMath::Pow(10.0, inAmp4000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Z);
+					outAmp4000 = 20 * FMath::LogX(10, outAmp4000 / (20 * FMath::Pow(10.0, -6.0)) );
 
 					// Adding the ray point
 					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
@@ -641,23 +641,23 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						inAmp4000 = FMath::Max(inAmp4000, 0.0);
 
 						// Applying absorption to sound energy
-						float outAmp125 = FMath::Pow(10.0, inAmp125 / 20 - 12.0) * (1.0 - absorptions1[i-1].X);
-						outAmp125 = 20 * FMath::LogX(10, outAmp125 / FMath::Pow(10.0, -12.0));
+						float outAmp125 = 20 * FMath::Pow(10.0, inAmp125 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].X);
+						outAmp125 = 20 * FMath::LogX( 10, outAmp125 / (20 * FMath::Pow(10.0, -6.0)) );
 
-						float outAmp250 = FMath::Pow(10.0, inAmp250 / 20 - 12.0) * (1.0 - absorptions1[i-1].Y);
-						outAmp250 = 20 * FMath::LogX(10, outAmp250 / FMath::Pow(10.0, -12.0));
+						float outAmp250 = 20 * FMath::Pow(10.0, inAmp250 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Y);
+						outAmp250 = 20 * FMath::LogX( 10, outAmp250 / (20 * FMath::Pow(10.0, -6.0)) );
 
-						float outAmp500 = FMath::Pow(10.0, inAmp500 / 20 - 12.0) * (1.0 - absorptions1[i-1].Z);
-						outAmp500 = 20 * FMath::LogX(10, outAmp500 / FMath::Pow(10.0, -12.0));
+						float outAmp500 = 20 * FMath::Pow(10.0, inAmp500 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Z);
+						outAmp500 = 20 * FMath::LogX( 10, outAmp500 / (20 * FMath::Pow(10.0, -6.0)) );
 
-						float outAmp1000 = FMath::Pow(10.0, inAmp1000 / 20 - 12.0) * (1.0 - absorptions2[i-1].X);
-						outAmp1000 = 20 * FMath::LogX(10, outAmp1000 / FMath::Pow(10.0, -12.0));
+						float outAmp1000 = 20 * FMath::Pow(10.0, inAmp1000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].X);
+						outAmp1000 = 20 * FMath::LogX( 10, outAmp1000 / (20 * FMath::Pow(10.0, -6.0)) );
 
-						float outAmp2000 = FMath::Pow(10.0, inAmp2000 / 20 - 12.0) * (1.0 - absorptions2[i-1].Y);
-						outAmp2000 = 20 * FMath::LogX(10, outAmp2000 / FMath::Pow(10.0, -12.0));
+						float outAmp2000 = 20 * FMath::Pow(10.0, inAmp2000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Y);
+						outAmp2000 = 20 * FMath::LogX( 10, outAmp2000 / (20 * FMath::Pow(10.0, -6.0)) );
 
-						float outAmp4000 = FMath::Pow(10.0, inAmp4000 / 20 - 12.0) * (1.0 - absorptions2[i-1].Z);
-						outAmp4000 = 20 * FMath::LogX(10, outAmp4000 / FMath::Pow(10.0, -12.0));
+						float outAmp4000 = 20 * FMath::Pow(10.0, inAmp4000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Z);
+						outAmp4000 = 20 * FMath::LogX( 10, outAmp4000 / (20 * FMath::Pow(10.0, -6.0)) );
 
 						// Adding the ray point
 						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
