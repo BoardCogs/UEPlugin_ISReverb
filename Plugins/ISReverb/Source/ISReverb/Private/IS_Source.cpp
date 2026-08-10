@@ -20,8 +20,6 @@ void AIS_Source::BeginPlay()
 
 void AIS_Source::Tick(float DeltaSeconds)
 {
-	timer += DeltaSeconds;
-
 	// Recomputing
 	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > recomputeDistance || cueISGeneration )
 	{
@@ -61,7 +59,11 @@ void AIS_Source::Tick(float DeltaSeconds)
 		}
 	}
 
+	// TODO: move play sound logic elsewhere
+
 	// Playing sound regularly
+	timer += DeltaSeconds;
+	
 	if (timer >= 2)
 	{
 		timer = 0;
@@ -321,12 +323,12 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 				// Adding first point (source) and setting the position from which the sound arrives to listener
 				soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
-														-1, FMath::Max(soundAmplitude, 0.0),
-														-1, FMath::Max(soundAmplitude, 0.0),
-														-1, FMath::Max(soundAmplitude, 0.0),
-														-1, FMath::Max(soundAmplitude, 0.0),
-														-1, FMath::Max(soundAmplitude, 0.0),
-														-1, FMath::Max(soundAmplitude, 0.0)
+														-1, FMath::Max(soundLevel, 0.0),
+														-1, FMath::Max(soundLevel, 0.0),
+														-1, FMath::Max(soundLevel, 0.0),
+														-1, FMath::Max(soundLevel, 0.0),
+														-1, FMath::Max(soundLevel, 0.0),
+														-1, FMath::Max(soundLevel, 0.0)
 														  ) );
 				soundRay.ISPosition = node->Position;
 
@@ -581,12 +583,12 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 
 					// Adding first point (source) and setting the position from which the sound arrives to listener
 					soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
-															-1, FMath::Max(soundAmplitude, 0.0),
-															-1, FMath::Max(soundAmplitude, 0.0),
-															-1, FMath::Max(soundAmplitude, 0.0),
-															-1, FMath::Max(soundAmplitude, 0.0),
-															-1, FMath::Max(soundAmplitude, 0.0),
-															-1, FMath::Max(soundAmplitude, 0.0)
+															-1, FMath::Max(soundLevel, 0.0),
+															-1, FMath::Max(soundLevel, 0.0),
+															-1, FMath::Max(soundLevel, 0.0),
+															-1, FMath::Max(soundLevel, 0.0),
+															-1, FMath::Max(soundLevel, 0.0),
+															-1, FMath::Max(soundLevel, 0.0)
 												          ) );
 					soundRay.ISPosition = node->Position;
 
@@ -883,9 +885,9 @@ void AIS_Source::PlaySound()
 			// Distance in logarithmic scale
 			float drop = FMath::Log2( FMath::Max(distance, 100) / 100);
 			// Amplitude of the original sound is reduced by the drop due to distance from listener, roughly -6 dB each time distance doubles
-			float amp = FMath::Max( soundAmplitude - (drop * 6) , 0.0 );
+			float amp = FMath::Max( soundLevel - (drop * 6) , 0.0 );
 			// Amplitude normalized in [0,1] range
-			float normalizedAmp = amp / soundAmplitude;
+			float normalizedAmp = amp / soundLevel;
 
 			OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
 			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
@@ -903,7 +905,7 @@ void AIS_Source::PlaySound()
 		// Spawning reverb audio
 		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 		{
-			if (ray.FinalAmplitudes1.X / soundAmplitude < 0.01 && ray.FinalAmplitudes1.Y / soundAmplitude < 0.01 && ray.FinalAmplitudes1.Z / soundAmplitude < 0.01 && ray.FinalAmplitudes2.X / soundAmplitude < 0.01 && ray.FinalAmplitudes2.Y / soundAmplitude < 0.01 && ray.FinalAmplitudes2.Z / soundAmplitude < 0.01)
+			if (ray.FinalAmplitudes1.X / soundLevel < 0.01 && ray.FinalAmplitudes1.Y / soundLevel < 0.01 && ray.FinalAmplitudes1.Z / soundLevel < 0.01 && ray.FinalAmplitudes2.X / soundLevel < 0.01 && ray.FinalAmplitudes2.Y / soundLevel < 0.01 && ray.FinalAmplitudes2.Z / soundLevel < 0.01)
 			{
 				continue;
 			}
@@ -914,12 +916,12 @@ void AIS_Source::PlaySound()
 			{
 				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
 				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
-				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalAmplitudes1.X / soundAmplitude);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalAmplitudes1.Y / soundAmplitude);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalAmplitudes1.Z / soundAmplitude);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalAmplitudes2.X / soundAmplitude);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalAmplitudes2.Y / soundAmplitude);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalAmplitudes2.Z / soundAmplitude);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalAmplitudes1.X / soundLevel);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalAmplitudes1.Y / soundLevel);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalAmplitudes1.Z / soundLevel);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalAmplitudes2.X / soundLevel);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalAmplitudes2.Y / soundLevel);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalAmplitudes2.Z / soundLevel);
 			}
 		}
 	}
@@ -1032,7 +1034,7 @@ void AIS_Source::DrawDebug()
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesLow"), AmplitudesLow);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesMed"), AmplitudesMed);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesHigh"), AmplitudesHigh);
-						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), soundAmplitude);
+						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), soundLevel);
 						NiagaraComp->Activate(true);
 					}
 

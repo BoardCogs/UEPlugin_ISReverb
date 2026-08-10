@@ -116,9 +116,9 @@ public:
     UPROPERTY(EditAnywhere)
     int recomputeDistance = 150;
 
-    /* Sound amplitude at 1 meter from source, in dB */
+    /* Sound pressure level at 1 meter from source, in dB */
     UPROPERTY(EditAnywhere)
-    float soundAmplitude;
+    float soundLevel;
 
     /* Set to true to visualize ISs (performance heavy) */
     UPROPERTY(EditAnywhere)
