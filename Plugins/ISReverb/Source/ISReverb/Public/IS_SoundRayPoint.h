@@ -21,22 +21,22 @@ public:
 	// The world position of this point
 	FVector3f PointPosition;
 
-	// Sound amplitudes right before sound bounces off surface, for three different frequency bands
+	// Sound levels (in percentage) right before sound bounces off surface, for three different frequency bands
 	// These values are not present in the first point of each ray, as it indicates the source
-	float InAmplitude125;
-	float InAmplitude250;
-	float InAmplitude500;
-	float InAmplitude1000;
-	float InAmplitude2000;
-	float InAmplitude4000;
+	float InLevel125;
+	float InLevel250;
+	float InLevel500;
+	float InLevel1000;
+	float InLevel2000;
+	float InLevel4000;
 	
-	// Sound amplitudes right after sound bounces off surface, for three different frequency bands
+	// Sound levels (in percentage) right after sound bounces off surface, for three different frequency bands
 	// These values are not present in the last point of each ray, as it indicates the listener
-	float OutAmplitude125;
-	float OutAmplitude250;
-	float OutAmplitude500;
-	float OutAmplitude1000;
-	float OutAmplitude2000;
-	float OutAmplitude4000;
+	float OutLevel125;
+	float OutLevel250;
+	float OutLevel500;
+	float OutLevel1000;
+	float OutLevel2000;
+	float OutLevel4000;
 	
 };

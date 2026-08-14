@@ -323,12 +323,12 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 				// Adding first point (source) and setting the position from which the sound arrives to listener
 				soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
-														-1, FMath::Max(soundLevel, 0.0),
-														-1, FMath::Max(soundLevel, 0.0),
-														-1, FMath::Max(soundLevel, 0.0),
-														-1, FMath::Max(soundLevel, 0.0),
-														-1, FMath::Max(soundLevel, 0.0),
-														-1, FMath::Max(soundLevel, 0.0)
+														-1, 1,
+														-1, 1,
+														-1, 1,
+														-1, 1,
+														-1, 1,
+														-1, 1
 														  ) );
 				soundRay.ISPosition = node->Position;
 
@@ -354,50 +354,38 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					// Adding the cumulative distance from source
 					cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
 					
-					// Total drop in amplitude is log2( totalDistance / initialDistance )
-					// Where initialDistance is the distance of the original amplitude (again, assumed to be 1 meter)
-					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+					// Total drop in dB is log2( totalDistance / initialDistance )
+					// Where initialDistance is the distance of the original level (again, assumed to be 1 meter, 100 units)
+					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
 					
-					// This is the factor by how much the amplitude drops in this segment of the ray
-					drop = totalDrop - lastAmplitudeDrop;
+					// This is the factor by how much the level drops in this segment of the ray
+					drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
 					
-					// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
-					inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude125 - (drop * 6);
-					inAmp125 = FMath::Max(inAmp125, 0.0);
+					// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
+					inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
 						
-					inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude250 - (drop * 6);
-					inAmp250 = FMath::Max(inAmp250, 0.0);
+					inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
 						
-					inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude500 - (drop * 6);
-					inAmp500 = FMath::Max(inAmp500, 0.0);
+					inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
 
-					inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude1000 - (drop * 6);
-					inAmp1000 = FMath::Max(inAmp1000, 0.0);
+					inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
 
-					inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude2000 - (drop * 6);
-					inAmp2000 = FMath::Max(inAmp2000, 0.0);
+					inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel2000 * drop;
 
-					inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude4000 - (drop * 6);
-					inAmp4000 = FMath::Max(inAmp4000, 0.0);
+					inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop;
 
 					// Applying absorption to sound energy
-					float outAmp125 = 20 * FMath::Pow(10.0, inAmp125 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].X);
-					outAmp125 = 20 * FMath::LogX(10, outAmp125 / (20 * FMath::Pow(10.0, -6.0)) );
+					float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
 
-					float outAmp250 = 20 * FMath::Pow(10.0, inAmp250 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Y);
-					outAmp250 = 20 * FMath::LogX(10, outAmp250 / (20 * FMath::Pow(10.0, -6.0)) );
+					float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
 
-					float outAmp500 = 20 * FMath::Pow(10.0, inAmp500 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Z);
-					outAmp500 = 20 * FMath::LogX(10, outAmp500 / (20 * FMath::Pow(10.0, -6.0)) );
+					float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
 
-					float outAmp1000 = 20 * FMath::Pow(10.0, inAmp1000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].X);
-					outAmp1000 = 20 * FMath::LogX(10, outAmp1000 / (20 * FMath::Pow(10.0, -6.0)) );
+					float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
 
-					float outAmp2000 = 20 * FMath::Pow(10.0, inAmp2000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Y);
-					outAmp2000 = 20 * FMath::LogX(10, outAmp2000 / (20 * FMath::Pow(10.0, -6.0)) );
+					float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
 
-					float outAmp4000 = 20 * FMath::Pow(10.0, inAmp4000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Z);
-					outAmp4000 = 20 * FMath::LogX(10, outAmp4000 / (20 * FMath::Pow(10.0, -6.0)) );
+					float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
 
 					// Adding the ray point
 					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
@@ -412,32 +400,27 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					lastAmplitudeDrop = totalDrop;
 				}
 
-				// All operations are repeated for the last point
+				// All operations regarding level drop due to distance are repeated for the last point
 				cumulativeDistance += (intersections[0] - intersections[1]).Length();
-				totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
-				drop = totalDrop - lastAmplitudeDrop;
+				totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
+				drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
 				
-				inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude125 - (drop * 6);
-				inAmp125 = FMath::Max(inAmp125, 0.0);
+				inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
 					
-				inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude250 - (drop * 6);
-				inAmp250 = FMath::Max(inAmp250, 0.0);
+				inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
 					
-				inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude500 - (drop * 6);
-				inAmp500 = FMath::Max(inAmp500, 0.0);
+				inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
 
-				inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude1000 - (drop * 6);
-				inAmp1000 = FMath::Max(inAmp1000, 0.0);
+				inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
 
-				inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude2000 - (drop * 6);
-				inAmp2000 = FMath::Max(inAmp2000, 0.0);
+				inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel2000 * drop;
 
-				inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude4000 - (drop * 6);
-				inAmp4000 = FMath::Max(inAmp4000, 0.0);
-					
+				inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel4000 * drop;
+
+				// the final point and final percentage levels are set
 				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp125, -1, inAmp250, -1, inAmp500, -1, inAmp1000, -1, inAmp2000, -1, inAmp4000, -1) );
-				soundRay.FinalAmplitudes1 = FVector3f(inAmp125,inAmp250,inAmp500);
-				soundRay.FinalAmplitudes2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
+				soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
+				soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
 				SoundRaysBackBuffer->AddRay(soundRay);
 			}
@@ -583,12 +566,12 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 
 					// Adding first point (source) and setting the position from which the sound arrives to listener
 					soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
-															-1, FMath::Max(soundLevel, 0.0),
-															-1, FMath::Max(soundLevel, 0.0),
-															-1, FMath::Max(soundLevel, 0.0),
-															-1, FMath::Max(soundLevel, 0.0),
-															-1, FMath::Max(soundLevel, 0.0),
-															-1, FMath::Max(soundLevel, 0.0)
+															-1, 1,
+															-1, 1,
+															-1, 1,
+															-1, 1,
+															-1, 1,
+															-1, 1
 												          ) );
 					soundRay.ISPosition = node->Position;
 
@@ -614,50 +597,38 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						// Adding the cumulative distance from source
 						cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
 						
-						// Total drop in amplitude is log2( totalDistance / initialDistance )
-						// Where initialDistance is the distance of the original amplitude (again, assumed to be 1 meter)
-						totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
+						// Total drop in dB is log2( totalDistance / initialDistance )
+						// Where initialDistance is the distance of the original level (again, assumed to be 1 meter, 100 units)
+						totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
 						
-						// This is the factor by how much the amplitude drops in this segment of the ray
-						drop = totalDrop - lastAmplitudeDrop;
+						// This is the factor by how much the level drops in this segment of the ray
+						drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
 						
-						// Incoming amplitude is the outgoing amplitude of the last point minus the drop due to distance
-						inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude125 - (drop * 6);
-						inAmp125 = FMath::Max(inAmp125, 0.0);
+						// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
+						inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
 						
-						inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude250 - (drop * 6);
-						inAmp250 = FMath::Max(inAmp250, 0.0);
+						inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
 						
-						inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude500 - (drop * 6);
-						inAmp500 = FMath::Max(inAmp500, 0.0);
+						inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
 
-						inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude1000 - (drop * 6);
-						inAmp1000 = FMath::Max(inAmp1000, 0.0);
+						inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
 
-						inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude2000 - (drop * 6);
-						inAmp2000 = FMath::Max(inAmp2000, 0.0);
+						inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel2000 * drop;
 
-						inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutAmplitude4000 - (drop * 6);
-						inAmp4000 = FMath::Max(inAmp4000, 0.0);
+						inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop;
 
 						// Applying absorption to sound energy
-						float outAmp125 = 20 * FMath::Pow(10.0, inAmp125 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].X);
-						outAmp125 = 20 * FMath::LogX( 10, outAmp125 / (20 * FMath::Pow(10.0, -6.0)) );
+						float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
 
-						float outAmp250 = 20 * FMath::Pow(10.0, inAmp250 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Y);
-						outAmp250 = 20 * FMath::LogX( 10, outAmp250 / (20 * FMath::Pow(10.0, -6.0)) );
+						float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
 
-						float outAmp500 = 20 * FMath::Pow(10.0, inAmp500 / 20.0 - 6.0) * (1.0 - absorptions1[i-1].Z);
-						outAmp500 = 20 * FMath::LogX( 10, outAmp500 / (20 * FMath::Pow(10.0, -6.0)) );
+						float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
 
-						float outAmp1000 = 20 * FMath::Pow(10.0, inAmp1000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].X);
-						outAmp1000 = 20 * FMath::LogX( 10, outAmp1000 / (20 * FMath::Pow(10.0, -6.0)) );
+						float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
 
-						float outAmp2000 = 20 * FMath::Pow(10.0, inAmp2000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Y);
-						outAmp2000 = 20 * FMath::LogX( 10, outAmp2000 / (20 * FMath::Pow(10.0, -6.0)) );
+						float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
 
-						float outAmp4000 = 20 * FMath::Pow(10.0, inAmp4000 / 20.0 - 6.0) * (1.0 - absorptions2[i-1].Z);
-						outAmp4000 = 20 * FMath::LogX( 10, outAmp4000 / (20 * FMath::Pow(10.0, -6.0)) );
+						float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
 
 						// Adding the ray point
 						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
@@ -672,32 +643,27 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 						lastAmplitudeDrop = totalDrop;
 					}
 
-					// All operations are repeated for the last point
+					// All operations regarding level drop due to distance are repeated for the last point
 					cumulativeDistance += (intersections[0] - intersections[1]).Length();
-					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100);
-					drop = totalDrop - lastAmplitudeDrop;
+					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
+					drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
 					
-					inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude125 - (drop * 6);
-					inAmp125 = FMath::Max(inAmp125, 0.0);
+					inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
 					
-					inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude250 - (drop * 6);
-					inAmp250 = FMath::Max(inAmp250, 0.0);
+					inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
 					
-					inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude500 - (drop * 6);
-					inAmp500 = FMath::Max(inAmp500, 0.0);
+					inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
 
-					inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude1000 - (drop * 6);
-					inAmp1000 = FMath::Max(inAmp1000, 0.0);
+					inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
 
-					inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude2000 - (drop * 6);
-					inAmp2000 = FMath::Max(inAmp2000, 0.0);
+					inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel2000 * drop;
 
-					inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutAmplitude4000 - (drop * 6);
-					inAmp4000 = FMath::Max(inAmp4000, 0.0);
-					
+					inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel4000 * drop;
+
+					// the final point and final percentage levels are set
 					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp125, -1, inAmp250, -1, inAmp500, -1, inAmp1000, -1, inAmp2000, -1, inAmp4000, -1) );
-					soundRay.FinalAmplitudes1 = FVector3f(inAmp125,inAmp250,inAmp500);
-					soundRay.FinalAmplitudes2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
+					soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
+					soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
 					SoundRaysLock.Lock();
 					SoundRaysBackBuffer->AddRay(soundRay);
@@ -882,21 +848,21 @@ void AIS_Source::PlaySound()
 		{
 			// Distance between source and listener
 			float distance = (FVector3f(this->GetTransform().GetLocation()) - ListenerPosition).Length();
-			// Distance in logarithmic scale
-			float drop = FMath::Log2( FMath::Max(distance, 100) / 100);
-			// Amplitude of the original sound is reduced by the drop due to distance from listener, roughly -6 dB each time distance doubles
-			float amp = FMath::Max( soundLevel - (drop * 6) , 0.0 );
-			// Amplitude normalized in [0,1] range
-			float normalizedAmp = amp / soundLevel;
+			// Distance converted to dB loss, roughly -6 dB each time distance doubles
+			float drop = FMath::Log2( FMath::Max(distance, 100) / 100) * 6;
+			// dB loss converted into percentage
+			float linearDrop = FMath::Pow( 10, -drop / 20 );
 
 			OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+			// TODO: add gain to metasounds
+			//ReverbAudio->SetFloatParameter(TEXT("Gain"), soundGain);
 			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
-			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), normalizedAmp);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), normalizedAmp);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection500"), normalizedAmp);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection1000"), normalizedAmp);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection2000"), normalizedAmp);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection4000"), normalizedAmp);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), linearDrop);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), linearDrop);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection500"), linearDrop);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection1000"), linearDrop);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection2000"), linearDrop);
+			OriginalAudio->SetFloatParameter(TEXT("Reflection4000"), linearDrop);
 		}
 
 		// Getting the front sound ray buffer
@@ -905,7 +871,8 @@ void AIS_Source::PlaySound()
 		// Spawning reverb audio
 		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 		{
-			if (ray.FinalAmplitudes1.X / soundLevel < 0.01 && ray.FinalAmplitudes1.Y / soundLevel < 0.01 && ray.FinalAmplitudes1.Z / soundLevel < 0.01 && ray.FinalAmplitudes2.X / soundLevel < 0.01 && ray.FinalAmplitudes2.Y / soundLevel < 0.01 && ray.FinalAmplitudes2.Z / soundLevel < 0.01)
+			// Checking if the percentage of remaining energy is not below 0.001%, equivalent to -100 dB
+			if (ray.FinalLevels1.X < 0.00001 && ray.FinalLevels1.Y < 0.00001 && ray.FinalLevels1.Z < 0.00001 && ray.FinalLevels2.X < 0.00001 && ray.FinalLevels2.Y < 0.00001 && ray.FinalLevels2.Z < 0.00001)
 			{
 				continue;
 			}
@@ -915,13 +882,15 @@ void AIS_Source::PlaySound()
 			if (ReverbAudio)
 			{
 				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+				// TODO: add gain to metasounds
+				//ReverbAudio->SetFloatParameter(TEXT("Gain"), soundGain);
 				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
-				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalAmplitudes1.X / soundLevel);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalAmplitudes1.Y / soundLevel);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalAmplitudes1.Z / soundLevel);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalAmplitudes2.X / soundLevel);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalAmplitudes2.Y / soundLevel);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalAmplitudes2.Z / soundLevel);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalLevels1.X);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalLevels1.Y);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalLevels1.Z);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalLevels2.X);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalLevels2.Y);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalLevels2.Z);
 			}
 		}
 	}
@@ -1018,12 +987,12 @@ void AIS_Source::DrawDebug()
 						// Building Niagara FX input parameters
 						// Ray position
 						Ray.Add(FVector(point->PointPosition));
-						AmplitudesLow.Add((point->InAmplitude125 + point->InAmplitude250) / 2);
-						AmplitudesLow.Add((point->OutAmplitude125 + point->OutAmplitude250) / 2);
-						AmplitudesMed.Add((point->InAmplitude500 + point->InAmplitude1000) / 2);
-						AmplitudesMed.Add((point->OutAmplitude500 + point->OutAmplitude1000) / 2);
-						AmplitudesHigh.Add((point->InAmplitude2000 + point->InAmplitude4000) / 2);
-						AmplitudesHigh.Add((point->OutAmplitude2000 + point->OutAmplitude4000) / 2);
+						AmplitudesLow.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
 					}
 
 					//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();

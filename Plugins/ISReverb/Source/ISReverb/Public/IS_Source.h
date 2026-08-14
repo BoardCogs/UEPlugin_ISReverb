@@ -116,9 +116,9 @@ public:
     UPROPERTY(EditAnywhere)
     int recomputeDistance = 150;
 
-    /* Sound pressure level at 1 meter from source, in dB */
+    /* Sound gain in dB */
     UPROPERTY(EditAnywhere)
-    float soundLevel;
+    float soundGain = 0;
 
     /* Set to true to visualize ISs (performance heavy) */
     UPROPERTY(EditAnywhere)
@@ -143,6 +143,10 @@ public:
     float CutArea = 1000;
 
     //[Header("Visualize")]
+
+    /* Maximum sound pressure level at 1 meter from source, in dB. Used only for graphical representation to show perception of sound */
+    UPROPERTY(EditAnywhere)
+    float soundLevel = 50;
 
     /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
