@@ -854,8 +854,7 @@ void AIS_Source::PlaySound()
 			float linearDrop = FMath::Pow( 10, -drop / 20 );
 
 			OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-			// TODO: add gain to metasounds
-			//ReverbAudio->SetFloatParameter(TEXT("Gain"), soundGain);
+			OriginalAudio->SetFloatParameter(TEXT("Gain"), soundGain);
 			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
 			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), linearDrop);
 			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), linearDrop);
@@ -882,8 +881,7 @@ void AIS_Source::PlaySound()
 			if (ReverbAudio)
 			{
 				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-				// TODO: add gain to metasounds
-				//ReverbAudio->SetFloatParameter(TEXT("Gain"), soundGain);
+				ReverbAudio->SetFloatParameter(TEXT("Gain"), soundGain);
 				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
 				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalLevels1.X);
 				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalLevels1.Y);
