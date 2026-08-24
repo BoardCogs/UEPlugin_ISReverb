@@ -97,16 +97,16 @@ public:
     bool EnableMultithreading;
 
     /* Set to true to activate IS generation (only in play mode) */
-    UPROPERTY(EditAnywhere)
-    bool generateImageSources = false;
+    //UPROPERTY(EditAnywhere)
+    //bool generateImageSources = false;
 
     /* Set to true to activate path generation and checking (only in play mode) */
-    UPROPERTY(EditAnywhere)
-    bool generateReflectionPaths = false;
+    //UPROPERTY(EditAnywhere)
+    //bool generateReflectionPaths = false;
 
     /* Set to true to play sound from source (only in play mode) */
-    UPROPERTY(EditAnywhere)
-    bool playSound = false;
+    //UPROPERTY(EditAnywhere)
+    //bool playSound = false;
 
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
@@ -120,15 +120,15 @@ public:
     UPROPERTY(EditAnywhere)
     float soundGain = 0;
 
-    /* Set to true to visualize ISs (performance heavy) */
-    UPROPERTY(EditAnywhere)
-    bool drawImageSources = false;
-
     //[Header("Optimizations")]
 
     /* Set true to remove all ISs that fall on the front side of their reflecting surface */
     UPROPERTY(EditAnywhere)
     bool WrongSideOfReflector = true;
+
+    /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs */
+    UPROPERTY(EditAnywhere)
+    bool BackSideSurfaces = true;
 
     /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector */
     UPROPERTY(EditAnywhere)
@@ -155,6 +155,10 @@ public:
     /* The maximum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
     int MaxOrder = -1;
+
+    /* Set to true to visualize ISs */
+    UPROPERTY(EditAnywhere)
+    bool drawImageSources = false;
 
     //[Header("Debug")]
 
@@ -189,7 +193,7 @@ protected:
     virtual void Tick(float DeltaSeconds) override;
 
     // Called upon changes made in the editor.
-    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+    //virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 
     
@@ -205,6 +209,7 @@ private:
     TFuture<IS_Tree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
     
     // Generates paths for sound reflections, checking if the sound reaches the listener
+    UFUNCTION(BlueprintCallable)
     void GenerateAllReflectionPaths();
 
     void GenerateRP(AIS_Listener* listener);
@@ -229,14 +234,12 @@ public:
     // Returns 1 / -1 if a plane and line intersect, 0 if the plane and segment are parallel, point of intersection is in output in the variable intersection
     // Return 1 if intersection is obtained by adding to linePoint a positive multiple of lineVec,-1 otherwise
     static int LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint, FVector3f lineVec, FVector3f planeNormal, FVector3f planePoint, double epsilon = 1e-6);
-
-
-
+    
     // Returns true if two TArrays of room pointers have at least one room in common
     static bool RoomsInCommon(TArray<AIS_Room*> a, TArray<AIS_Room*> b);
-
-
-
+    
+    // Plays assigned sound, applying reverberation according to the computed reflection paths
+    UFUNCTION(BlueprintCallable)
     void PlaySound();
     
 

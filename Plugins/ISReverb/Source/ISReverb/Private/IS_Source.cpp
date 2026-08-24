@@ -79,6 +79,8 @@ void AIS_Source::GenerateISs()
 	TArray<AActor*> listeners; 
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIS_Listener::StaticClass(), listeners);
 
+	trees.Empty();
+
 	// Generating an ISTree for each listener in the level
 	for (AActor* actor : listeners)
 	{
@@ -121,7 +123,7 @@ void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 	currentlyExecuting = true;
 	
 	// Generates ISTree and adds it to the array
-	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
+	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
 	trees.Add(listener, tree);
 
 	// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
@@ -174,7 +176,7 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f 
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, position, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
+		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
 		Promise->SetValue(tree);
 	});
 
@@ -432,7 +434,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 	int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
 
 	UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
-								  "%i ISs with a valid path out of %i total ISs"),
+								  "%i ISs with a valid path out of %i total ISs\n"),
 								  TimeElapsedInMs, validPaths, nodes.Num());
 
 	currentFrontBufferIs1 = !currentFrontBufferIs1;
@@ -683,7 +685,7 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
 			
 			UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
-										  "%i ISs with a valid path out of %i total ISs"),
+										  "%i ISs with a valid path out of %i total ISs\n"),
 										  TimeElapsedInMs, validISs, totalISs);
 
 			currentFrontBufferIs1 = !currentFrontBufferIs1;
@@ -762,7 +764,7 @@ void AIS_Source::UpdateCurrentRoom()
 }
 
 
-
+/*
 void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	// Saving a backup of current rooms
@@ -823,13 +825,13 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 	// Restore collisions (the engine will do its thing and all rooms will be back again)
 	SetActorEnableCollision(true);
 
-	/*
-	 * P.S.: I know what I'm doing with the rooms seems out of place, but it's necessary.
-	 * If you don't trust me, try removing the first three and last two lines of code and watch how nothing works
-	 * when trying to call these functions from the edit page.
-	*/
-}
+	
+	// P.S.: I know what I'm doing with the rooms seems out of place, but it's necessary.
+	// If you don't trust me, try removing the first three and last two lines of code and watch how nothing works
+	// when trying to call these functions from the edit page.
 
+}
+*/
 
 
 void AIS_Source::PlaySound()
