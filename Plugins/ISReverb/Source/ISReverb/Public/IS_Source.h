@@ -30,6 +30,9 @@ public:
     AIS_Source();
 
 private:
+    // All listeners in the scene (only one should be present)
+    TArray<AIS_Listener*> _listeners;
+    
     // Image Sources trees, one for each listener
     TMap<AIS_Listener*, IS_Tree> trees;
 

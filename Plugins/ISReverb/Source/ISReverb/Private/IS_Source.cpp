@@ -75,18 +75,23 @@ void AIS_Source::Tick(float DeltaSeconds)
 
 void AIS_Source::GenerateISs()
 {
+	// Clearing listeners
+	_listeners.Empty();
+	
 	// Getting all listeners
 	TArray<AActor*> listeners; 
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIS_Listener::StaticClass(), listeners);
+	
+	for (AActor* actor : listeners)
+	{
+		_listeners.Add(Cast<AIS_Listener>(actor));
+	}
 
 	trees.Empty();
 
 	// Generating an ISTree for each listener in the level
-	for (AActor* actor : listeners)
+	for (AIS_Listener* listener : _listeners)
 	{
-		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Inside listeners loop"));
-		AIS_Listener* listener = Cast<AIS_Listener>(actor);
-
 		FVector3f position;
 
 		// If listener and source are in the same room, generate ISs using that room's surfaces
@@ -836,12 +841,10 @@ void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEv
 
 void AIS_Source::PlaySound()
 {
-	if (SoundEmitter != nullptr)
+	if (SoundEmitter != nullptr && _listeners.Num() > 0)
 	{
-		// Getting the first listener (tests should only be performed with one)
-		TArray<AIS_Listener*> listeners;
-		trees.GetKeys(listeners);
-    	FVector3f ListenerPosition = FVector3f(listeners[0]->GetTransform().GetLocation());
+		// Getting the first listener (there should only be one)
+    	FVector3f ListenerPosition = FVector3f(_listeners[0]->GetTransform().GetLocation());
 
 		// Spawning the original sound
 		UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
