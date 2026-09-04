@@ -119,15 +119,17 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         return false;
     }
 
+
+    
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
     FVector3f pos = parentNode->Position;
-    pos -= 2 * FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) * surface->Normal();
+    float d = FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() );
 
 
 
     // 2
-    // Checking that the IS is not on the wrong side of the reflector, standing on the opposite side of the surface's normal
-    if ( _wrongSideOfReflector && FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) >= 0 )
+    // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
+    if ( _wrongSideOfReflector && d <= 0 )
     {
         wrongSideLock.Lock();
         _wrongSide++;
@@ -135,6 +137,11 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         
         return false;
     }
+
+
+
+    // Computing the position of the new IS by mirroring its parent along the reflecting surface
+    pos -= 2 * d * surface->Normal();
 
 
 
@@ -461,7 +468,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
     }
 
 
-    // 4
+    // 5
     // Projection area check
     if (_cutArea > 0)
     {
