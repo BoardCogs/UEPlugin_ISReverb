@@ -513,6 +513,7 @@ void IS_Tree::CheckBackSideSurfaces()
         for (int j = i + 1; j < _surfaces.Num(); j++)
         {
             bool intersection = false;
+            bool isBehind = false;
 
             // Checking if the edges of surface i are intersected by the plane of surface j
             for (IS_ReflectorEdge edge : _surfaces[i]->Edges())
@@ -524,44 +525,50 @@ void IS_Tree::CheckBackSideSurfaces()
                 }
             }
 
-            if ( intersection )
-                continue;
-
-            // Checking if the edges of surface j are intersected by the plane of surface i
-            for (IS_ReflectorEdge edge : _surfaces[j]->Edges())
+            // If surface i is on the backside of surface j
+            if ( !intersection && (_surfaces[i]->Points()[0] - _surfaces[j]->Points()[0]).Dot(_surfaces[j]->Normal()) < 0 )
             {
-                if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, _surfaces[i]->Normal(), _surfaces[i]->Points()[0] ) )
+                isBehind = true;
+            }
+            else
+            {
+                intersection = false;
+
+                // Checking if the edges of surface j are intersected by the plane of surface i
+                for (IS_ReflectorEdge edge : _surfaces[j]->Edges())
                 {
-                    intersection = true;
-                    break;
+                    if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, _surfaces[i]->Normal(), _surfaces[i]->Points()[0] ) )
+                    {
+                        intersection = true;
+                        break;
+                    }
+                }
+
+                // If surface j is on the backside of surface i
+                if ( !intersection && (_surfaces[j]->Points()[0] - _surfaces[i]->Points()[0]).Dot(_surfaces[i]->Normal()) < 0 )
+                {
+                    isBehind = true;
                 }
             }
 
             // If both of the planes of the two surfaces DO NOT intersect the other surface, then each surface is completely on one side of the other 
-            if ( !intersection )
+            if ( isBehind )
             {
-                // If surface j is on the backside of surface i or if surface i is on the backside of surface j
-                if (
-                    (_surfaces[j]->Points()[0] - _surfaces[i]->Points()[0]).Dot(_surfaces[i]->Normal()) < 0 ||
-                    (_surfaces[i]->Points()[0] - _surfaces[j]->Points()[0]).Dot(_surfaces[j]->Normal()) < 0
-                    )
-                {
-                    UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
-                    
-                    TArray<AIS_ReflectorSurface*> iBackSideSurfaces = TArray<AIS_ReflectorSurface*>();
+                UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
+                
+                TArray<AIS_ReflectorSurface*> iBackSideSurfaces = TArray<AIS_ReflectorSurface*>();
 
-                    // Adding surface i and j to the list of surfaces that are on the backside of each other
-                    if (_backSideSurfacesList.Contains(_surfaces[i]))
-                    {
-                        iBackSideSurfaces = _backSideSurfacesList[_surfaces[i]];
-                        iBackSideSurfaces.Add(_surfaces[j]);
-                        _backSideSurfacesList.Add( _surfaces[i], iBackSideSurfaces );
-                    }
-                    else
-                    {
-                        iBackSideSurfaces.Add(_surfaces[j]);
-                        _backSideSurfacesList.Add( _surfaces[i], iBackSideSurfaces );
-                    }
+                // Adding surface i and j to the list of surfaces that are on the backside of each other
+                if (_backSideSurfacesList.Contains(_surfaces[i]))
+                {
+                    iBackSideSurfaces = _backSideSurfacesList[_surfaces[i]];
+                    iBackSideSurfaces.Add(_surfaces[j]);
+                    _backSideSurfacesList.Add( _surfaces[i], iBackSideSurfaces );
+                }
+                else
+                {
+                    iBackSideSurfaces.Add(_surfaces[j]);
+                    _backSideSurfacesList.Add( _surfaces[i], iBackSideSurfaces );
                 }
             }
             
