@@ -213,8 +213,14 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             {
                 IS_ReflectorEdge edge = beam.Edges()[e];
 
+                if (blackList.Contains(edge))
+                {
+                    e++;
+                    continue;
+                }
+
                 // Checks if the edge intersects the plane
-                if ( !blackList.Contains(edge) && LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentNode->Position ) )
+                if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentNode->Position ) )
                 {
                     // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
                     bool doNothing = false;
