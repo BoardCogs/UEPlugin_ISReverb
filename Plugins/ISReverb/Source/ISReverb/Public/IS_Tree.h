@@ -17,7 +17,7 @@ public:
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing);
+    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea, bool debugBeamTracing);
 
 private:
 	// PROPERTIES
@@ -39,6 +39,12 @@ private:
     // Amount of ISs saved by not generating ISs on the front side of a reflector
     int _wrongSide = 0;
 
+	// Wheter to optimize by not generating ISs on the front side of a reflector
+	bool _backSideSurfaces;
+
+	// Amount of ISs saved by not generating ISs on the front side of a reflector
+	int _backSide = 0;
+
     // Wheter to optimize by not generating ISs for surfaces that fall outside the beam of their parent IS
     bool _beamTracing;
 
@@ -48,26 +54,42 @@ private:
     // Amount of ISs saved by using beam tracing and clipping
     int _beam = 0;
 
+	// Projections with less are than this are discarded
+	float _cutArea;
+
+	// Amount of ISs saved by cutting beams with areas smaller than the specified threshold
+	int _area = 0;
+
     // In case of debug, this counter stores the actual number of active ISs created
     int _realISs = 0;
 
     // Generates ISs that would be shaved by beam tracing and clipping as inactive ISs, allows to check wether the optimization is accurate or not
     bool _debugBeamTracing;
 
+	// The list of surfaces for this simulation
 	TArray<AIS_ReflectorSurface*> _surfaces;
+
+	// The list of surfaces such that at least one is on the backside of the other
+	TMap<AIS_ReflectorSurface*, TArray<AIS_ReflectorSurface*>> _backSideSurfacesList;
 
 	// METHODS
     // All reflectors in the scene
     TArray<AIS_ReflectorSurface*> Surfaces();
 
     // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock);
+    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& backSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock);
+
+	// This function checks, given two surfaces, whether one of them is completely behind the other 
+	void CheckBackSideSurfaces();
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
     TArray<FVector3f> CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection);
 
     // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points
     bool CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points);
+
+	// Given the points of a convex polygon, computes its area
+	float ComputePolygonArea(IS_BeamProjection* beam);
 
 public:
 	// PROPERTIES

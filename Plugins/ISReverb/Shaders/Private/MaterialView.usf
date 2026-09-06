@@ -27,27 +27,18 @@ void GenerateCosineNormalRay(
 )
 {
 	// Draw random variable
-	float2 BufferSize = View.BufferSizeAndInvSize.xy;
 	float2 RandSample = RandomSequence_GenerateSample2D(RandSequence);
 
 	// Perform cosine-hemispherical sampling and convert to world-space
 	float4 Direction_Tangent;
-	#if 1
-	{
-		Direction_Tangent = CosineSampleHemisphereConcentric(RandSample);
-		Direction_Tangent.w = Direction_Tangent.z;
-	}
-	#else
-	{
-		Direction_Tangent = CosineSampleHemisphere(RandSample);
-	}
-	#endif
-
+	Direction_Tangent = CosineSampleHemisphereConcentric(RandSample);
+	Direction_Tangent.w = Direction_Tangent.z;
+	
 	float3 Direction_World = TangentToWorld(Direction_Tangent.xyz, WorldNormal);
 
 	RayOrigin = TranslatedWorldPosition;
 	RayDirection = Direction_World;
-	RayTMin = 1.0;
+	RayTMin = 0.5;
 	RayTMax = MaxRayDistance;
 }
 
@@ -90,30 +81,34 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 	if (Payload.IsHit())
 	{
 		// Red = low freqs
-		HitColor.x = Payload.GetRoughness();
+		HitColor.x = (pow(10, Payload.GetRoughness()) -1) / 9;
+		//HitColor.x = log10( 1.0 + 9.0 * Payload.GetRoughness() );
 		// Green = medium freqs
-		HitColor.y = Payload.GetMetallic();
+		HitColor.y = (pow(10, Payload.GetMetallic()) -1) / 9;
+		//HitColor.y = log10( 1.0 + 9.0 * Payload.GetMetallic() );
 		// Blue = high freqs
-		HitColor.z = Payload.GetSpecular();
+		HitColor.z = (pow(10, Payload.GetSpecular()) -1) / 9;
+		//HitColor.z = log10( 1.0 + 9.0 * Payload.GetSpecular() );
 
-		float shading = 1.0;
-		float occlusion = 1.0;
+		float diffuseMax = 0.6;
+		float ambientMax = 0.4;
+
+		float diffuse = diffuseMax;
+		float ambient = ambientMax;
 
 		// Diffuse
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 0))
 		{
-			shading = dot(View.DirectionalLightDirection, Payload.GetWorldNormal());
+			diffuse = dot(View.DirectionalLightDirection, Payload.GetWorldNormal());
 			
-			if (shading >= 0.0)
+			if (diffuse >= 0.0)
 			{
-				shading = shading * 0.4 + 0.6;
+				diffuse = diffuse * diffuseMax;
 			}
 			else
 			{
-				shading = 0.6;
+				diffuse = 0.0;
 			}
-			
-			//shading = (shading - -1.0) * (1 - 0.5) / (1 - -1.0) + 0.5;
 		}
 
 		// Ambient occlusion
@@ -122,8 +117,6 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 			float hitNum = 0.0;
 			float HitT = Payload.HitT;
 			float3 HitWorldPos = PrimaryRay.Origin + (PrimaryRay.Direction * HitT);
-
-			//float closestRayHitDistance = 10000.0;
 
 			uint TimeSeed = View.StateFrameIndex;
 
@@ -146,35 +139,71 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				if (MinimalPayload.IsHit())
 				{
 					hitNum += 1.0;
-					//closestRayHitDistance = min(closestRayHitDistance, MinimalPayload.HitT);
 
+					// Linear scaling for occlusion (each intersection has constant occluding factor)
 					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 0)
 					{
-						occlusion -= 0.5 / SamplesPerPixel;	
+						ambient -= ambientMax / SamplesPerPixel;	
+					}
+
+					// Distance based scaling for occlusion
+					if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 3)
+					{
+						ambient -= ambientMax / SamplesPerPixel * ( 1.0 - MinimalPayload.HitT / MaxRayDistance );
 					}
 				}
 			}
-			
+
+			// Factorial scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 1)
 			{
-				occlusion -= 0.5 / ((SamplesPerPixel + 1) * SamplesPerPixel / 2) * ((hitNum + 1) * hitNum / 2);
+				ambient -= ambientMax / ((SamplesPerPixel + 1) * SamplesPerPixel / 2.0) * ((hitNum + 1.0) * hitNum / 2.0);
 			}
 
+			// Exponential scaling for occlusion (each intersection has increasing occluding factor)
 			if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 3) == 2)
 			{
-				occlusion -= 0.5 / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
+				ambient -= ambientMax / (SamplesPerPixel * SamplesPerPixel) * (hitNum * hitNum);
 			}
+
+			/*
+			RWAmbientOcclusionMaskUAV[PixelCoord] = ambient;
+			RWAmbientOcclusionHitDistanceUAV[PixelCoord] = HitT;
 			
-			//RWAmbientOcclusionMaskUAV[PixelCoord] = occlusion;
-			//RWAmbientOcclusionHitDistanceUAV[PixelCoord] = closestRayHitDistance == 10000.0 ? -1.0 : closestRayHitDistance;
+			if (RWAmbientOcclusionHitDistanceUAV[PixelCoord] >= 0)
+			{
+				ambient = 0.0;
+				int2 neighbor;
+				float weight;
+				float weightTotal = 0.0;
+				int filterDimension = 10; 
+				
+				for (int row = -filterDimension; row < filterDimension + 1; ++row)
+				{
+					for (int col = -filterDimension; col < filterDimension + 1; ++col)
+					{
+						neighbor = PixelCoord + int2(row,col);
+						weight = pow( 2 , filterDimension * 2 ) / pow( 2 , abs(row) + abs(col) );
+
+						//RWAmbientOcclusionHitDistanceUAV[PixelCoord] - RWAmbientOcclusionHitDistanceUAV[neighbor] < 1
+						
+						if (RWAmbientOcclusionHitDistanceUAV[neighbor] >= 0)
+						{
+							if (RWAmbientOcclusionMaskUAV[neighbor] <= 0.5 && RWAmbientOcclusionMaskUAV[neighbor] >= 0.0)
+							{
+								ambient += RWAmbientOcclusionMaskUAV[neighbor] * weight;
+								weightTotal += weight;
+							}
+						}
+					}
+				}
+				
+				ambient = ambient / weightTotal;
+				RWAmbientOcclusionMaskUAV[PixelCoord] = ambient;	
+			}
+			*/
+			
 		}
-		/*
-		else
-		{
-			RWAmbientOcclusionMaskUAV[PixelCoord] = 1.0;
-			RWAmbientOcclusionHitDistanceUAV[PixelCoord] = 1.0;	
-		}
-		*/
 		
 		// Shadow
 		if (GET_SCALAR_ARRAY_ELEMENT(RenderParams, 2))
@@ -200,11 +229,11 @@ RAY_TRACING_ENTRY_RAYGEN(MaterialViewRG)
 				);
 			if (ShadowPayload.IsHit())
 			{
-				shading = 0.6;
+				diffuse = 0.0;
 			}
 		}
 
-		OutputTexture[DispatchRaysIndex().xy] = float4(HitColor * shading * occlusion, 1.0);
+		OutputTexture[DispatchRaysIndex().xy] = float4(HitColor * (diffuse + ambient), 1.0);
 		return;
 	}
 

@@ -2,7 +2,7 @@
 
 
 
-IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool beamTracing, bool beamClipping, bool debugBeamTracing)
+IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea, bool debugBeamTracing)
 {
     if (r == 0)
         return;
@@ -12,11 +12,20 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     _surfaces = Surfaces();
     _sn = _surfaces.Num();
     _wrongSideOfReflector = wrongSideOfReflector;
+    _backSideSurfaces = backSideSurfaces;
     _beamTracing = beamTracing;
     _beamClipping = beamClipping;
+    _cutArea = cutArea;
     _debugBeamTracing = debugBeamTracing;
 
     FDateTime StartTime = FDateTime::UtcNow();
+
+    // Checking for surfaces that face completely away from each other
+    if (_backSideSurfaces)
+    {
+        _backSideSurfacesList.Empty();
+        CheckBackSideSurfaces();
+    }
 
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
@@ -33,7 +42,9 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     FCriticalSection nodesLock;
     FCriticalSection noDoubleLock;
     FCriticalSection wrongSideLock;
+    FCriticalSection backSideLock;
     FCriticalSection beamLock;
+    FCriticalSection areaLock;
     FCriticalSection realISsLock;
     
     // Creating all ISs from second order onward
@@ -59,7 +70,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
                 {
-                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, beamLock, realISsLock) )
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, backSideLock, beamLock, areaLock, realISsLock) )
                     {
                         iLock.Lock();
                         i++;
@@ -76,19 +87,21 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     Sending to console a debug message showing the total number of ISs created and the amount saved by optimization.
     The number of not generated ISs is only the tip of the iceberg: their children would have also been generated.
     */
-    UE_LOG(LogTemp, Display, TEXT("IS generation over in %i milliseconds\n"
+    UE_LOG(LogTemp, Display, TEXT("\nIS generation over in %i milliseconds\n"
                                   "Total number of ISs generated: %i\n"
                                   "Optimizations:\n"
                                   " - No reflection on same surface twice in a row: %i ISs removed\n"
                                   " - Wrong side of reflector: %i ISs removed\n"
-                                  " - Beam tracing%hs: %i ISs removed"),
-                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, (_beamClipping ? " + clipping" : ""), _beam);
+                                  " - Backside surfaces: %i ISs removed\n"
+                                  " - Beam tracing%hs: %i ISs removed\n"
+                                  " - Cut area: %i ISs removed"),
+                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, _backSide, (_beamClipping ? " + clipping" : ""), _beam, _area);
 }
 
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& beamLock, FCriticalSection& realISsLock)
+bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& backSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock)
 {
     nodesLock.Lock();
     IS* parentNode = &_nodes[parent];
@@ -106,15 +119,17 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         return false;
     }
 
+
+    
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
     FVector3f pos = parentNode->Position;
-    pos -= 2 * FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) * surface->Normal();
+    float d = FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() );
 
 
 
     // 2
-    // Checking that the IS is not on the wrong side of the reflector, standing on the opposite side of the surface's normal
-    if ( _wrongSideOfReflector && FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() ) >= 0 )
+    // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
+    if ( _wrongSideOfReflector && d <= 0 )
     {
         wrongSideLock.Lock();
         _wrongSide++;
@@ -125,7 +140,46 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
 
 
+    // Computing the position of the new IS by mirroring its parent along the reflecting surface
+    pos -= 2 * d * surface->Normal();
+
+
+
     // 3
+    // Checking that the two surfaces are not one on the backside of the other
+    if ( _backSideSurfaces )
+    {
+        backSideLock.Lock();
+
+        // Checking if the two surfaces are listed together
+        // Either the parent surface is in the list of this IS's surface
+        if (_backSideSurfacesList.Contains(surface))
+        {
+            if (_backSideSurfacesList[surface].Contains(parentNode->Surface))
+            {
+                _backSide++;
+                backSideLock.Unlock();
+                return false;
+            }
+        }
+
+        // Or this IS's surface is in the list of the parent surface
+        if (_backSideSurfacesList.Contains(parentNode->Surface))
+        {
+            if (_backSideSurfacesList[parentNode->Surface].Contains(surface))
+            {
+                _backSide++;
+                backSideLock.Unlock();
+                return false;
+            }
+        }
+        
+        backSideLock.Unlock();
+    }
+
+
+
+    // 4
     // Checking that reflections from parent to this surface are possible with beam tracing (+ clipping)
 
     IS_BeamProjection beam = IS_BeamProjection( surface->Points() , surface->Edges() );
@@ -159,8 +213,14 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             {
                 IS_ReflectorEdge edge = beam.Edges()[e];
 
+                if (blackList.Contains(edge))
+                {
+                    e++;
+                    continue;
+                }
+
                 // Checks if the edge intersects the plane
-                if ( !blackList.Contains(edge) && LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentNode->Position ) )
+                if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentNode->Position ) )
                 {
                     // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
                     bool doNothing = false;
@@ -414,6 +474,21 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
     }
 
 
+    // 5
+    // Projection area check
+    if (_cutArea > 0)
+    {
+        if (ComputePolygonArea(&beam) < _cutArea)
+        {
+            areaLock.Lock();
+            _area++;
+            areaLock.Unlock();
+            
+            return false;   
+        }
+    }
+
+    
     nodesLock.Lock();
     
     // IS is created and its position is given
@@ -429,6 +504,82 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
     realISsLock.Unlock();
 
     return true;
+}
+
+
+
+// This function checks, given two surfaces, whether one of them is completely behind the other
+void IS_Tree::CheckBackSideSurfaces()
+{
+    FVector3f intersectionPoint;
+
+    // Comparing all surfaces against each other
+    for (int i = 0; i < _surfaces.Num(); i++)
+    {
+        for (int j = i + 1; j < _surfaces.Num(); j++)
+        {
+            bool intersection = false;
+            bool isBehind = false;
+
+            // Checking if the edges of surface i are intersected by the plane of surface j
+            for (IS_ReflectorEdge edge : _surfaces[i]->Edges())
+            {
+                if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, _surfaces[j]->Normal(), _surfaces[j]->Points()[0] ) )
+                {
+                    intersection = true;
+                    break;
+                }
+            }
+
+            // If surface i is on the backside of surface j
+            if ( !intersection && (_surfaces[i]->Points()[0] - _surfaces[j]->Points()[0]).Dot(_surfaces[j]->Normal()) < 0 )
+            {
+                isBehind = true;
+            }
+            else
+            {
+                intersection = false;
+
+                // Checking if the edges of surface j are intersected by the plane of surface i
+                for (IS_ReflectorEdge edge : _surfaces[j]->Edges())
+                {
+                    if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, _surfaces[i]->Normal(), _surfaces[i]->Points()[0] ) )
+                    {
+                        intersection = true;
+                        break;
+                    }
+                }
+
+                // If surface j is on the backside of surface i
+                if ( !intersection && (_surfaces[j]->Points()[0] - _surfaces[i]->Points()[0]).Dot(_surfaces[i]->Normal()) < 0 )
+                {
+                    isBehind = true;
+                }
+            }
+
+            // If both of the planes of the two surfaces DO NOT intersect the other surface, then each surface is completely on one side of the other 
+            if ( isBehind )
+            {
+                UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
+                
+                TArray<AIS_ReflectorSurface*> iBackSideSurfaces = TArray<AIS_ReflectorSurface*>();
+
+                // Adding surface i and j to the list of surfaces that are on the backside of each other
+                if (_backSideSurfacesList.Contains(_surfaces[i]))
+                {
+                    iBackSideSurfaces = _backSideSurfacesList[_surfaces[i]];
+                    iBackSideSurfaces.Add(_surfaces[j]);
+                    _backSideSurfacesList.Add( _surfaces[i], iBackSideSurfaces );
+                }
+                else
+                {
+                    iBackSideSurfaces.Add(_surfaces[j]);
+                    _backSideSurfacesList.Add( _surfaces[i], iBackSideSurfaces );
+                }
+            }
+            
+        }
+    }
 }
 
 
@@ -494,6 +645,25 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
         // The line and plane are parallel (no intersection)
         return false;
     }
+}
+
+
+
+float IS_Tree::ComputePolygonArea(IS_BeamProjection* beam)
+{
+    float area = 0.0;
+
+    FVector3f pointC = beam->Points()[0];
+    
+    for (IS_ReflectorEdge e : beam->Edges())
+    {
+        if (e.PointA != pointC && e.PointB != pointC)
+        {
+            area += FVector3f::CrossProduct(e.PointA - pointC, e.PointB - pointC).Length() / 2;
+        }
+    }
+    
+    return area;
 }
 
 

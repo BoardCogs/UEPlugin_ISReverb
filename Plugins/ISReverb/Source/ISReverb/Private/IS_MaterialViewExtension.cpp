@@ -1,6 +1,5 @@
 ﻿#include "IS_MaterialViewExtension.h"
 #include "Runtime/Renderer/Internal/PostProcess/PostProcessInputs.h"
-//#include "Runtime/Renderer/Private/ScreenSpaceDenoise.h"
 #include "Runtime/Renderer/Private/ScenePrivate.h"
 #include "Runtime/Renderer/Private/SceneRendering.h"
 #include "RayTracingShaderBindingLayout.h"
@@ -14,15 +13,13 @@
 static TAutoConsoleVariable<int32> CVarMaterialView(
 	TEXT("r.Raytracing.MaterialView.Enable"),
 	0,
-	TEXT("Enables material properties visualization: all meshes will be rendered with a simple color showcasing roughness, metallic and specular factor.\n"
-		      "Red = Roughness\n"
-		      "Green = Metallic\n"
-		      "Blue = Specular\n"
-		      "The plugins's Reflector Surfaces will instead show their reflection coefficients for sound frequencies.\n"
+	TEXT("Enables material properties visualization: the plugins's Reflector Surfaces will be colored to show their "
+	          "reflection coefficients for sound frequencies, modelled by changing their roughness, metallic and specular factor.\n"
 			  "Red = Low frequencies\n"
 			  "Green = Medium frequencies\n"
 			  "Blue = High frequencies\n"
-			  "Note: Crash if ray tracing shadows are not enabled.\n"
+			  "Note: it's recommended to disable raytracing visibility for all other meshes in the scene, for which "
+	          "the RGB colors will show roughness, metallic and specular components. Will crash if ray tracing shadows are not enabled.\n"
 			  "0: Off, 1: On"),
 	ECVF_RenderThreadSafe
 );
@@ -37,7 +34,7 @@ static TAutoConsoleVariable<int32> CVarMaterialViewDiffuse(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusion(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusion.Enable"),
-	5,
+	2,
 	TEXT("Enables ambient occlusion for the material view.\n"
 			  "0: Off, 1+: Number of samples per pixel"),
 	ECVF_RenderThreadSafe
@@ -53,11 +50,12 @@ static TAutoConsoleVariable<int32> CVarMaterialViewShadow(
 
 static TAutoConsoleVariable<int32> CVarMaterialViewAmbientOcclusionMode(
 	TEXT("r.Raytracing.MaterialViewAmbientOcclusionScaling.Set"),
-	1,
+	3,
 	TEXT("Defines how ambient occlusion scales with number of positive samples.\n"
 			  "0: Linear\n"
 			  "1: Factorial\n"
-			  "2: Exponential"),
+			  "2: Exponential\n"
+			  "3: Distance based"),
 	ECVF_RenderThreadSafe
 );
 
@@ -138,18 +136,8 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 		FRDGTexture* OutputRDGTexture = GraphBuilder.CreateTexture(OutputDesc, TEXT("MaterialView.Output"));
 		FRDGTextureUAV* OutputUAV = GraphBuilder.CreateUAV(OutputRDGTexture);
 
-		/*
-		IScreenSpaceDenoiser::FAmbientOcclusionInputs DenoiserInputs;
-		{
-			FRDGTextureDesc Desc = FRDGTextureDesc::Create2D(
-				TextureSize,
-				PF_R16F,
-				FClearValueBinding::None,
-				TexCreate_ShaderResource | TexCreate_RenderTargetable | TexCreate_UAV);
-			DenoiserInputs.Mask = GraphBuilder.CreateTexture(Desc, TEXT("RayTracingAmbientOcclusion"));
-			DenoiserInputs.RayHitDistance = GraphBuilder.CreateTexture(Desc, TEXT("RayTracingAmbientOcclusionHitDistance"));
-		}
-		*/
+		//FRDGTexture* RWAmbientOcclusionMaskRDGTexture = GraphBuilder.CreateTexture(OutputDesc, TEXT("MaterialView.Output"));
+		//FRDGTexture* RWAmbientOcclusionHitDistanceRDGTexture = GraphBuilder.CreateTexture(OutputDesc, TEXT("MaterialView.Output"));
 		
 		//pass param
 		{
@@ -157,9 +145,9 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 			FMaterialViewRG::FParameters* PassParameters = GraphBuilder.AllocParameters<FMaterialViewRG::FParameters>();
 
 			PassParameters->SamplesPerPixel = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
-			PassParameters->MaxRayDistance = View.FinalPostProcessSettings.RayTracingAORadius;
-			//PassParameters->RWAmbientOcclusionMaskUAV = GraphBuilder.CreateUAV(DenoiserInputs.Mask);
-			//PassParameters->RWAmbientOcclusionHitDistanceUAV = GraphBuilder.CreateUAV(DenoiserInputs.RayHitDistance);
+			PassParameters->MaxRayDistance = View.FinalPostProcessSettings.RayTracingAORadius / 2;
+			//PassParameters->RWAmbientOcclusionMaskUAV = GraphBuilder.CreateUAV(RWAmbientOcclusionMaskRDGTexture);
+			//PassParameters->RWAmbientOcclusionHitDistanceUAV = GraphBuilder.CreateUAV(RWAmbientOcclusionHitDistanceRDGTexture);
 			PassParameters->ViewUniformBuffer = InView.ViewUniformBuffer;
 			PassParameters->TLAS = RayTracingScene.GetLayerView(ERayTracingSceneLayer::Base);
 			PassParameters->Scene = GetSceneUniformBufferRef(GraphBuilder, InView);
@@ -200,23 +188,6 @@ void FIS_MaterialViewExtension::PrePostProcessPass_RenderThread(FRDGBuilder& Gra
 	        }
 		);
 		}
-		
-		/*
-		const IScreenSpaceDenoiser* DefaultDenoiser = IScreenSpaceDenoiser::GetDefaultDenoiser();
-		
-		IScreenSpaceDenoiser::FAmbientOcclusionRayTracingConfig RayTracingConfig;
-		RayTracingConfig.RayCountPerPixel = CVarMaterialViewAmbientOcclusion.GetValueOnRenderThread();
-
-		IScreenSpaceDenoiser::FAmbientOcclusionOutputs DenoiserOutputs = DefaultDenoiser->DenoiseAmbientOcclusion(
-			GraphBuilder,
-			View,
-			&View.PrevViewInfo,
-			FSceneTextureParameters(),
-			DenoiserInputs,
-			RayTracingConfig);
-		
-		//OutputRDGTexture = OutputRDGTexture + DenoiserOutputs.AmbientOcclusionMask;
-		*/
 
 		AddCopyTexturePass(GraphBuilder, OutputRDGTexture, SceneColor.Texture);
 	}

@@ -41,6 +41,7 @@ public class ISReverb : ModuleRules
 				"InputCore",
 				"UMG",
 				"Niagara",
+				"MetaSoundEngine",
 				"RenderCore",
 				"Renderer",
 				"RHI"
