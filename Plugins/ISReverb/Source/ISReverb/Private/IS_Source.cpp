@@ -221,6 +221,9 @@ void AIS_Source::GenerateRP(AIS_Listener* listener)
 
 void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 {
+	// Set state to currently executing
+	currentlyExecuting = true;
+	
 	FDateTime StartTime = FDateTime::UtcNow();
 	
 	FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
@@ -454,6 +457,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 {
+	// Set state to currently executing
+	currentlyExecuting = true;
+	
 	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
 	SoundRaysBackBuffer->Empty();
 	
