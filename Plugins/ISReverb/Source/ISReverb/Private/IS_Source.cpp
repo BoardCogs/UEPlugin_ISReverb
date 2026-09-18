@@ -417,7 +417,18 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 			soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
 			soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
-			SoundRaysBackBuffer->AddRay(soundRay);
+			for (int i = SoundRaysBackBuffer->GetNumRays() - 1; i >= -1; i--)
+			{
+				if (i == -1)
+				{
+					SoundRaysBackBuffer->SoundRays.Insert(soundRay, 0);						
+				}
+				else if ( (listenerPos - SoundRaysBackBuffer->GetRay(i)->ISPosition).Length() < (listenerPos - soundRay.ISPosition).Length() )
+				{
+					SoundRaysBackBuffer->SoundRays.Insert(soundRay, i + 1);
+					break;
+				}
+			}
 		}
 		
 		node->Path = TArray(intersections);
@@ -662,7 +673,20 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 				soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
 				SoundRaysLock.Lock();
-				SoundRaysBackBuffer->AddRay(soundRay);
+				
+				for (int i = SoundRaysBackBuffer->GetNumRays() - 1; i >= -1; i--)
+				{
+					if (i == -1)
+					{
+						SoundRaysBackBuffer->SoundRays.Insert(soundRay, 0);						
+					}
+					else if ( (listenerPos - SoundRaysBackBuffer->GetRay(i)->ISPosition).Length() < (listenerPos - soundRay.ISPosition).Length() )
+					{
+						SoundRaysBackBuffer->SoundRays.Insert(soundRay, i + 1);
+						break;
+					}
+				}
+				
 				SoundRaysLock.Unlock();
 			}
 			
@@ -758,75 +782,6 @@ void AIS_Source::UpdateCurrentRoom()
 	}
 }
 
-
-/*
-void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	// Saving a backup of current rooms
-	TArray<AIS_Room*> RoomsBackup = _rooms;
-	// Disabling all collisions (the engine will reset them upon calling Super anyway)
-	SetActorEnableCollision(false);
-	// Restoring current rooms
-	_rooms = RoomsBackup;
-	
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	// Getting the name of the changed variable
-	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
-	
-	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths" || MemberPropertyName == "playSound")
-	{
-		if (GetWorld()->WorldType != EWorldType::Editor)
-		{
-			if (generateImageSources == true)
-			{
-				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating ISs"));
-				generateImageSources = false;
-				GenerateISs();
-			}
-	
-			if (generateReflectionPaths == true)
-			{
-				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating reflections"));
-				generateReflectionPaths = false;
-				GenerateAllReflectionPaths();
-			}
-
-			if (playSound == true)
-			{
-				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Playing sound"));
-				playSound = false;
-				PlaySound();
-			}
-		}
-		else
-		{
-			// No IS generation and simulation unless the game is playing
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Not in editor mode please!"));
-			generateImageSources = false;
-			generateReflectionPaths = false;
-			playSound = false;
-		}
-	}
-
-	// If the property to draw image sources is toggled
-	if (MemberPropertyName == "drawImageSources" || MemberPropertyName == "MinOrder" || MemberPropertyName == "MaxOrder" || MemberPropertyName == "drawPlaneProjection" || MemberPropertyName == "checkNode")
-	{
-		DrawDebug();
-	}
-
-	// Empty rooms
-	_rooms.Empty();
-	// Restore collisions (the engine will do its thing and all rooms will be back again)
-	SetActorEnableCollision(true);
-
-	
-	// P.S.: I know what I'm doing with the rooms seems out of place, but it's necessary.
-	// If you don't trust me, try removing the first three and last two lines of code and watch how nothing works
-	// when trying to call these functions from the edit page.
-
-}
-*/
 
 
 void AIS_Source::PlaySound()
