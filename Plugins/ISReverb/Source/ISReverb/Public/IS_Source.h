@@ -64,13 +64,16 @@ private:
     // State of execution, true if either IS or RP generation is running
     bool currentlyExecuting = false;
 
-    // Wether IS generation is cued to start as soon as the current operation finishes 
+public:
+
+    // Wether IS generation is cued to start as soon as the current operation finishes
+    UPROPERTY(BlueprintReadWrite)
     bool cueISGeneration = false;
 
     // Wether RP generation is cued to start as soon as the current operation finishes
+    UPROPERTY(BlueprintReadWrite)
     bool cueRPGeneration = false;
-
-public:
+    
     /* The room(s) the source is currently in */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     FString Room;
@@ -178,12 +181,8 @@ public:
     int parentNode = 0;
 
     /* Set true to create invalid nodes (removed by optimizations) in the list below, to check for accurate removal */
-    UPROPERTY(EditAnywhere)
-    bool debugBeamTracing;
-
-    /* Nodes removed by optimization, list is always empty if the option above is set to false */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    TArray<int> inactiveNodes = TArray<int>();
+    //UPROPERTY(EditAnywhere)
+    //bool debugBeamTracing;
 
     FCriticalSection treesLock;
 

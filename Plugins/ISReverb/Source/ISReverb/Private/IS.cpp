@@ -1,6 +1,6 @@
 #include "IS.h"
 
-IS::IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surface, IS_BeamProjection beam, bool valid)
+IS::IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surface, IS_BeamProjection beam)
 {
 	Index = i;
 	Order = order;
@@ -8,7 +8,6 @@ IS::IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surfac
 	Position = pos;
 	Surface = surface;
 	BeamPoints = beam;
-	Valid = valid;
 	HasPath = true;
 	Path = TArray<FVector3f>();
 }

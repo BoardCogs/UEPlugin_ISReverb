@@ -13,7 +13,7 @@ class ISREVERB_API IS
 {
 public:
 	// CONSTRUCTOR
-	IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surface, IS_BeamProjection beam, bool valid = true);
+	IS(int i, int order, int parent, FVector3f pos, AIS_ReflectorSurface* surface, IS_BeamProjection beam);
 
 	// PROPERTIES
 	// The index of this Image Source in its ISTree
@@ -33,9 +33,6 @@ public:
 
 	// The points and edges resulting from beam tracing on this surface's reflector from its parent IS
 	IS_BeamProjection BeamPoints = IS_BeamProjection(TArray<FVector3f>(), TArray<IS_ReflectorEdge>());
-
-	// If false, the IS should have been removed
-	bool Valid;
 
 	// If true, the IS has a reflection path that reaches the listener
 	bool HasPath = true;

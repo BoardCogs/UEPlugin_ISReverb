@@ -128,21 +128,8 @@ void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
 	currentlyExecuting = true;
 	
 	// Generates ISTree and adds it to the array
-	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
+	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
 	trees.Add(listener, tree);
-
-	// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
-	if (debugBeamTracing)
-	{
-		inactiveNodes.Empty();
-		TArray<IS*> nodes = tree.Nodes();
-
-		for (int i = 0 ; i < nodes.Num() ; i++)
-		{
-			if (!nodes[i]->Valid)
-				inactiveNodes.Add(i);
-		}
-	}
 
 	GenerateRP(listener);
 }
@@ -181,7 +168,7 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f 
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, position, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
+		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
 		Promise->SetValue(tree);
 	});
 
@@ -251,8 +238,247 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 		FVector3f from;
 		FVector3f to;
 		
-		if (node->Valid)
+		// Innocent until proven guilty
+		node->HasPath = true;
+
+		intersections.Empty();
+		absorptions1.Empty();
+		absorptions2.Empty();
+
+		intersections.Add(listenerPos);
+		absorptions1.Add(FVector3f::Zero());
+		absorptions2.Add(FVector3f::Zero());
+
+		currentIndex = node->Index;
+		from = listenerPos;
+
+		// Iterating all checks going up the IS tree
+		while (currentIndex != -1)
 		{
+			currentNode = nodes[currentIndex];
+			to = currentNode->Position;
+
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
+
+			if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
+			{
+				AIS_ReflectorSurface* hitSurface = Cast<AIS_ReflectorSurface>( hit.GetActor() );
+
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
+
+				if ( hitSurface != nullptr && hitSurface == currentNode->Surface )
+				{
+					intersections.Add( FVector3f( hit.ImpactPoint ) );
+					absorptions1.Add( FVector3f( hitSurface->Absorption125 , hitSurface->Absorption250 , hitSurface->Absorption500 ));
+					absorptions2.Add( FVector3f( hitSurface->Absorption1000 , hitSurface->Absorption2000 , hitSurface->Absorption4000 ));
+					from = FVector3f( hit.ImpactPoint );
+				}
+				else
+				{
+					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("But the wrong thing"));
+					intersections.Add( FVector3f( hit.ImpactPoint ) );
+					node->HasPath = false;
+					break;
+				}
+			}
+			else
+			{
+				intersections.Add(to);
+				node->HasPath = false;
+				break;
+			}
+
+			currentIndex = currentNode->Parent;
+		}
+
+		// Final check from last intersection to source
+		if (node->HasPath)
+		{
+			to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
+			
+			if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
+			{
+				intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
+				absorptions1.Add(FVector3f::Zero());
+				absorptions2.Add(FVector3f::Zero());
+				node->HasPath = true;
+				validPaths++;
+			}
+			else
+			{
+				intersections.Add( FVector3f( hit.ImpactPoint ) );
+				node->HasPath = false;
+			}
+		}
+
+		// Adding sound ray if valid
+		if (node->HasPath)
+		{
+			soundRay.Clear();
+
+			// Adding first point (source) and setting the position from which the sound arrives to listener
+			soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
+													-1, 1,
+													-1, 1,
+													-1, 1,
+													-1, 1,
+													-1, 1,
+													-1, 1
+													  ) );
+			soundRay.ISPosition = node->Position;
+
+			// Sound amplitude is reduced by 6 dB each time distance doubles
+			// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
+			float cumulativeDistance = 0.0f;
+			// Total drop in amplitude due to cumulative distance from source
+			float totalDrop;
+			// Drop in amplitude in last ray point
+			float lastAmplitudeDrop = 0.0f;
+			// Drop in amplitude in this segment of the ray (total - last)
+			float drop;
+			// Amplitudes arriving at the ray point 
+			float inAmp125;
+			float inAmp250;
+			float inAmp500;
+			float inAmp1000;
+			float inAmp2000;
+			float inAmp4000;
+
+			for (int i = intersections.Num() - 1; i > 1; i--)
+			{
+				// Adding the cumulative distance from source
+				cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
+				
+				// Total drop in dB is log2( totalDistance / initialDistance )
+				// Where initialDistance is the distance of the original level (again, assumed to be 1 meter, 100 units)
+				totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
+				
+				// This is the factor by how much the level drops in this segment of the ray
+				drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
+				
+				// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
+				inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
+					
+				inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
+					
+				inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
+
+				inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
+
+				inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel2000 * drop;
+
+				inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop;
+
+				// Applying absorption to sound energy
+				float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
+
+				float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
+
+				float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
+
+				float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
+
+				float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
+
+				float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
+
+				// Adding the ray point
+				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
+													   inAmp125,outAmp125,
+													   inAmp250,outAmp250,
+													   inAmp500,outAmp500,
+													   inAmp1000,outAmp1000,
+													   inAmp2000,outAmp2000,
+													   inAmp4000,outAmp4000)
+													   );
+				
+				lastAmplitudeDrop = totalDrop;
+			}
+
+			// All operations regarding level drop due to distance are repeated for the last point
+			cumulativeDistance += (intersections[0] - intersections[1]).Length();
+			totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
+			drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
+			
+			inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
+				
+			inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
+				
+			inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
+
+			inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
+
+			inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel2000 * drop;
+
+			inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel4000 * drop;
+
+			// the final point and final percentage levels are set
+			soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp125, -1, inAmp250, -1, inAmp500, -1, inAmp1000, -1, inAmp2000, -1, inAmp4000, -1) );
+			soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
+			soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
+
+			SoundRaysBackBuffer->AddRay(soundRay);
+		}
+		
+		node->Path = TArray(intersections);
+	}
+
+	int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
+
+	UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
+								  "%i ISs with a valid path out of %i total ISs\n"),
+								  TimeElapsedInMs, validPaths, nodes.Num());
+
+	currentFrontBufferIs1 = !currentFrontBufferIs1;
+								  
+	DrawDebug();
+
+	// Set state to not currently executing
+	currentlyExecuting = false;
+}
+
+
+
+void AIS_Source::GenerateRPMT(AIS_Listener* listener)
+{
+	// Set state to currently executing
+	currentlyExecuting = true;
+	
+	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
+	SoundRaysBackBuffer->Empty();
+	
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, SoundRaysBackBuffer]()
+	{
+		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
+		
+		FDateTime StartTime = FDateTime::UtcNow();
+	
+		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
+
+		TArray<IS*> nodes = trees[listener].Nodes();
+
+		int validISs = 0;
+
+		FCriticalSection validISsLock;
+		FCriticalSection SoundRaysLock;
+		FCriticalSection PathLock;
+		
+		ParallelFor(nodes.Num(), [&](int32 index) mutable
+		{
+			IS* node = nodes[index];
+
+			FHitResult hit;
+			FCollisionQueryParams traceParams;
+			
+			TArray<FVector3f> intersections;
+			TArray<FVector3f> absorptions1;
+			TArray<FVector3f> absorptions2;
+
+			int currentIndex;
+			IS* currentNode = nullptr;
+			FVector3f from;
+			FVector3f to;
+			
 			// Innocent until proven guilty
 			node->HasPath = true;
 
@@ -317,7 +543,10 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					absorptions1.Add(FVector3f::Zero());
 					absorptions2.Add(FVector3f::Zero());
 					node->HasPath = true;
-					validPaths++;
+
+					validISsLock.Lock();
+					validISs++;
+					validISsLock.Unlock();
 				}
 				else
 				{
@@ -329,7 +558,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 			// Adding sound ray if valid
 			if (node->HasPath)
 			{
-				soundRay.Clear();
+				IS_SoundRay soundRay = IS_SoundRay();
 
 				// Adding first point (source) and setting the position from which the sound arrives to listener
 				soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
@@ -339,7 +568,7 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 														-1, 1,
 														-1, 1,
 														-1, 1
-														  ) );
+											          ) );
 				soundRay.ISPosition = node->Position;
 
 				// Sound amplitude is reduced by 6 dB each time distance doubles
@@ -373,9 +602,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 					
 					// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
 					inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
-						
+					
 					inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
-						
+					
 					inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
 
 					inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
@@ -399,13 +628,13 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 
 					// Adding the ray point
 					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
-														   inAmp125,outAmp125,
-														   inAmp250,outAmp250,
-														   inAmp500,outAmp500,
-														   inAmp1000,outAmp1000,
-														   inAmp2000,outAmp2000,
-														   inAmp4000,outAmp4000)
-														   );
+										  inAmp125,outAmp125,
+										  inAmp250,outAmp250,
+										  inAmp500,outAmp500,
+										  inAmp1000,outAmp1000,
+										  inAmp2000,outAmp2000,
+										  inAmp4000,outAmp4000)
+								);
 					
 					lastAmplitudeDrop = totalDrop;
 				}
@@ -416,9 +645,9 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 				drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
 				
 				inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
-					
+				
 				inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
-					
+				
 				inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
 
 				inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
@@ -432,259 +661,14 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 				soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
 				soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
+				SoundRaysLock.Lock();
 				SoundRaysBackBuffer->AddRay(soundRay);
+				SoundRaysLock.Unlock();
 			}
 			
+			PathLock.Lock();
 			node->Path = TArray(intersections);
-		}
-	}
-
-	int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
-
-	UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
-								  "%i ISs with a valid path out of %i total ISs\n"),
-								  TimeElapsedInMs, validPaths, nodes.Num());
-
-	currentFrontBufferIs1 = !currentFrontBufferIs1;
-								  
-	DrawDebug();
-
-	// Set state to not currently executing
-	currentlyExecuting = false;
-}
-
-
-
-void AIS_Source::GenerateRPMT(AIS_Listener* listener)
-{
-	// Set state to currently executing
-	currentlyExecuting = true;
-	
-	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
-	SoundRaysBackBuffer->Empty();
-	
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, SoundRaysBackBuffer]()
-	{
-		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
-		
-		FDateTime StartTime = FDateTime::UtcNow();
-	
-		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
-
-		TArray<IS*> nodes = trees[listener].Nodes();
-
-		int validISs = 0;
-
-		FCriticalSection validISsLock;
-		FCriticalSection SoundRaysLock;
-		
-		ParallelFor(nodes.Num(), [&](int32 index) mutable
-		{
-			IS* node = nodes[index];
-
-			FHitResult hit;
-			FCollisionQueryParams traceParams;
-			
-			TArray<FVector3f> intersections;
-			TArray<FVector3f> absorptions1;
-			TArray<FVector3f> absorptions2;
-
-			int currentIndex;
-			IS* currentNode = nullptr;
-			FVector3f from;
-			FVector3f to;
-
-			if (node->Valid)
-			{
-				// Innocent until proven guilty
-				node->HasPath = true;
-
-				intersections.Empty();
-				absorptions1.Empty();
-				absorptions2.Empty();
-
-				intersections.Add(listenerPos);
-				absorptions1.Add(FVector3f::Zero());
-				absorptions2.Add(FVector3f::Zero());
-
-				currentIndex = node->Index;
-				from = listenerPos;
-
-				// Iterating all checks going up the IS tree
-				while (currentIndex != -1)
-				{
-					currentNode = nodes[currentIndex];
-					to = currentNode->Position;
-
-					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
-
-					if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
-					{
-						AIS_ReflectorSurface* hitSurface = Cast<AIS_ReflectorSurface>( hit.GetActor() );
-
-						//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
-
-						if ( hitSurface != nullptr && hitSurface == currentNode->Surface )
-						{
-							intersections.Add( FVector3f( hit.ImpactPoint ) );
-							absorptions1.Add( FVector3f( hitSurface->Absorption125 , hitSurface->Absorption250 , hitSurface->Absorption500 ));
-							absorptions2.Add( FVector3f( hitSurface->Absorption1000 , hitSurface->Absorption2000 , hitSurface->Absorption4000 ));
-							from = FVector3f( hit.ImpactPoint );
-						}
-						else
-						{
-							//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("But the wrong thing"));
-							intersections.Add( FVector3f( hit.ImpactPoint ) );
-							node->HasPath = false;
-							break;
-						}
-					}
-					else
-					{
-						intersections.Add(to);
-						node->HasPath = false;
-						break;
-					}
-
-					currentIndex = currentNode->Parent;
-				}
-
-				// Final check from last intersection to source
-				if (node->HasPath)
-				{
-					to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
-					
-					if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
-					{
-						intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
-						absorptions1.Add(FVector3f::Zero());
-						absorptions2.Add(FVector3f::Zero());
-						node->HasPath = true;
-
-						validISsLock.Lock();
-						validISs++;
-						validISsLock.Unlock();
-					}
-					else
-					{
-						intersections.Add( FVector3f( hit.ImpactPoint ) );
-						node->HasPath = false;
-					}
-				}
-
-				// Adding sound ray if valid
-				if (node->HasPath)
-				{
-					IS_SoundRay soundRay = IS_SoundRay();
-
-					// Adding first point (source) and setting the position from which the sound arrives to listener
-					soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
-															-1, 1,
-															-1, 1,
-															-1, 1,
-															-1, 1,
-															-1, 1,
-															-1, 1
-												          ) );
-					soundRay.ISPosition = node->Position;
-
-					// Sound amplitude is reduced by 6 dB each time distance doubles
-					// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
-					float cumulativeDistance = 0.0f;
-					// Total drop in amplitude due to cumulative distance from source
-					float totalDrop;
-					// Drop in amplitude in last ray point
-					float lastAmplitudeDrop = 0.0f;
-					// Drop in amplitude in this segment of the ray (total - last)
-					float drop;
-					// Amplitudes arriving at the ray point 
-					float inAmp125;
-					float inAmp250;
-					float inAmp500;
-					float inAmp1000;
-					float inAmp2000;
-					float inAmp4000;
-
-					for (int i = intersections.Num() - 1; i > 1; i--)
-					{
-						// Adding the cumulative distance from source
-						cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
-						
-						// Total drop in dB is log2( totalDistance / initialDistance )
-						// Where initialDistance is the distance of the original level (again, assumed to be 1 meter, 100 units)
-						totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
-						
-						// This is the factor by how much the level drops in this segment of the ray
-						drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
-						
-						// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
-						inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
-						
-						inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
-						
-						inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
-
-						inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
-
-						inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel2000 * drop;
-
-						inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop;
-
-						// Applying absorption to sound energy
-						float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
-
-						float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
-
-						float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
-
-						float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
-
-						float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
-
-						float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
-
-						// Adding the ray point
-						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
-											  inAmp125,outAmp125,
-											  inAmp250,outAmp250,
-											  inAmp500,outAmp500,
-											  inAmp1000,outAmp1000,
-											  inAmp2000,outAmp2000,
-											  inAmp4000,outAmp4000)
-									);
-						
-						lastAmplitudeDrop = totalDrop;
-					}
-
-					// All operations regarding level drop due to distance are repeated for the last point
-					cumulativeDistance += (intersections[0] - intersections[1]).Length();
-					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
-					drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
-					
-					inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
-					
-					inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
-					
-					inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
-
-					inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
-
-					inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel2000 * drop;
-
-					inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel4000 * drop;
-
-					// the final point and final percentage levels are set
-					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp125, -1, inAmp250, -1, inAmp500, -1, inAmp1000, -1, inAmp2000, -1, inAmp4000, -1) );
-					soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
-					soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
-
-					SoundRaysLock.Lock();
-					SoundRaysBackBuffer->AddRay(soundRay);
-					SoundRaysLock.Unlock();
-				}
-				
-				node->Path = TArray(intersections);
-			}
+			PathLock.Unlock();
 		});
 
 		int totalISs = nodes.Num();
@@ -918,7 +902,6 @@ void AIS_Source::DrawDebug()
 	{
 		// Original source
 		DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
-		//DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
 
 		// Image Sources
 		if (trees.Num() > 0)
@@ -929,9 +912,7 @@ void AIS_Source::DrawDebug()
     	
 			for (IS* node : trees[listeners[0]].Nodes())
 			{
-				if (node->Valid == true)
-					DrawDebugPoint(GetWorld(), FVector(node->Position), 10, FColor::Green, true, -1);
-					//DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
+				DrawDebugPoint(GetWorld(), FVector(node->Position), 10, FColor::Green, true, -1);
 			}
 		}	
 	}
