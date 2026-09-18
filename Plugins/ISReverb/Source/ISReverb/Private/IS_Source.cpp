@@ -996,12 +996,12 @@ void AIS_Source::DrawDebug()
 						// Building Niagara FX input parameters
 						// Ray position
 						Ray.Add(FVector(point->PointPosition));
-						AmplitudesLow.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
-						AmplitudesLow.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
-						AmplitudesMed.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
-						AmplitudesMed.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
-						AmplitudesHigh.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
-						AmplitudesHigh.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
 					}
 
 					//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
@@ -1012,7 +1012,7 @@ void AIS_Source::DrawDebug()
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesLow"), AmplitudesLow);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesMed"), AmplitudesMed);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesHigh"), AmplitudesHigh);
-						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), soundLevel);
+						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), visualSoundLevel);
 						NiagaraComp->Activate(true);
 					}
 

@@ -149,7 +149,7 @@ public:
 
     /* Maximum sound pressure level at 1 meter from source, in dB. Used only for graphical representation to show perception of sound */
     UPROPERTY(EditAnywhere)
-    float soundLevel = 50;
+    float visualSoundLevel = 50;
 
     /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
