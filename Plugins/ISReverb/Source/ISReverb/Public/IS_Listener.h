@@ -18,7 +18,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FString Room;
 	
-	bool ActiveListener;
+	//bool ActiveListener;
 
 protected:
 	// Called every time OnEnter or OnExit add or remove a room

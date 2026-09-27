@@ -86,7 +86,7 @@ public:
     UPROPERTY(EditAnywhere)
     UNiagaraSystem* SoundRayFX;
 
-    /* The MateSound used to spawn audio */
+    /* The MetaSounds system used to spawn audio */
     UPROPERTY(EditAnywhere)
     UMetaSoundSource* SoundEmitter;
 
@@ -164,7 +164,15 @@ public:
 
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
-    bool drawImageSources = false;
+    bool drawSourcesAndListener = false;
+
+    /* Set to true to visualize ISs */
+    UPROPERTY(EditAnywhere)
+    float ISSize = 10;
+    
+    /* Set to true to visualize ISs */
+    UPROPERTY(EditAnywhere)
+    float SourceAndListenerSize = 50;
 
     //[Header("Debug")]
 

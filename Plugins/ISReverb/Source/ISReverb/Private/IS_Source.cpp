@@ -853,10 +853,13 @@ void AIS_Source::DrawDebug()
 
 	
 	// Draws original source and ISs
-	if (drawImageSources)
+	if (drawSourcesAndListener)
 	{
 		// Original source
-		DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
+		//DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
+		DrawDebugLine(GetWorld(), GetTransform().TransformPosition(FVector3d(SourceAndListenerSize,0,0)), GetTransform().TransformPosition(FVector3d(-SourceAndListenerSize,0,0)), FColor::Black, true, -1, 0, 4);
+		DrawDebugLine(GetWorld(), GetTransform().TransformPosition(FVector3d(0,SourceAndListenerSize,0)), GetTransform().TransformPosition(FVector3d(0,-SourceAndListenerSize,0)), FColor::Black, true, -1, 0, 4);
+		DrawDebugLine(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,SourceAndListenerSize)), GetTransform().TransformPosition(FVector3d(0,0,-SourceAndListenerSize)), FColor::Black, true, -1, 0, 4);
 
 		// Image Sources
 		if (trees.Num() > 0)
@@ -864,10 +867,12 @@ void AIS_Source::DrawDebug()
 			// Getting the first listener (tests should only be performed with one)
 			TArray<AIS_Listener*> listeners; 
 			trees.GetKeys(listeners);
+			
+			DrawDebugSphere(GetWorld(), listeners[0]->GetTransform().TransformPosition(FVector3d(0,0,0)), SourceAndListenerSize, 50, FColor::Black, true, -1, 0, 4);
     	
 			for (IS* node : trees[listeners[0]].Nodes())
 			{
-				DrawDebugPoint(GetWorld(), FVector(node->Position), 10, FColor::Green, true, -1);
+				DrawDebugPoint(GetWorld(), FVector(node->Position), ISSize, FColor::Black, true, -1);
 			}
 		}	
 	}
