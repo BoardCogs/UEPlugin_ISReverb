@@ -144,7 +144,7 @@ public:
     UPROPERTY(EditAnywhere)
     bool BeamClipping = true;
 
-    /* Projections with less are than this are discarded, set to <=0 to disable */
+    /* Beam projections with less area than this are discarded, set to <=0 to disable */
     UPROPERTY(EditAnywhere)
     float CutArea = 1000;
 
