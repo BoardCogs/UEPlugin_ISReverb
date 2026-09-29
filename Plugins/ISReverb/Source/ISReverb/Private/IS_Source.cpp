@@ -42,17 +42,20 @@ void AIS_Source::Tick(float DeltaSeconds)
 		{
 			for (TPair<AIS_Listener*, IS_Tree>& pair : trees)
 			{
-				if ( (FVector3f(pair.Key->GetTransform().GetLocation()) - LastListenerPos).Length() > recomputeDistance || cueRPGeneration )
+				if (pair.Key != nullptr)
 				{
-					if (!currentlyExecuting)
+					if ( (FVector3f(pair.Key->GetTransform().GetLocation()) - LastListenerPos).Length() > recomputeDistance || cueRPGeneration )
 					{
-						cueRPGeneration = false;
-						
-						GenerateRP(pair.Key);
-					}
-					else
-					{
-						cueRPGeneration = true;
+						if (!currentlyExecuting)
+						{
+							cueRPGeneration = false;
+							
+							GenerateRP(pair.Key);
+						}
+						else
+						{
+							cueRPGeneration = true;
+						}
 					}
 				}
 			}
