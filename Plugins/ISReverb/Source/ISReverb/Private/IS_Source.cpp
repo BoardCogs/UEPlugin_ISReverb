@@ -21,6 +21,14 @@ void AIS_Source::BeginPlay()
 void AIS_Source::Tick(float DeltaSeconds)
 {
 	// Recomputing
+
+	if (startupTimer < 0.5)
+	{
+		startupTimer += DeltaSeconds;
+		return;
+	}
+
+	// If source has moved
 	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > recomputeDistance || cueISGeneration )
 	{
 		if (!currentlyExecuting)
@@ -37,23 +45,22 @@ void AIS_Source::Tick(float DeltaSeconds)
 	}
 	else
 	{
-		if (trees.IsEmpty()) {}
-		else
+		if (GetListener() != nullptr)
 		{
-			for (TPair<AIS_Listener*, IS_Tree>& pair : trees)
+			FVector3f listenerPos = FVector3f(GetListener()->GetTransform().GetLocation());
+
+			// If listener has moved
+			if ( (listenerPos - LastListenerPos).Length() > recomputeDistance || cueRPGeneration )
 			{
-				if ( (FVector3f(pair.Key->GetTransform().GetLocation()) - LastListenerPos).Length() > recomputeDistance || cueRPGeneration )
+				if (!currentlyExecuting)
 				{
-					if (!currentlyExecuting)
-					{
-						cueRPGeneration = false;
-						
-						GenerateRP(pair.Key);
-					}
-					else
-					{
-						cueRPGeneration = true;
-					}
+					cueRPGeneration = false;
+				
+					GenerateRP(listenerPos);
+				}
+				else
+				{
+					cueRPGeneration = true;
 				}
 			}
 		}
@@ -75,113 +82,114 @@ void AIS_Source::Tick(float DeltaSeconds)
 
 void AIS_Source::GenerateISs()
 {
-	// Clearing listeners
-	_listeners.Empty();
-	
-	// Getting all listeners
-	TArray<AActor*> listeners; 
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIS_Listener::StaticClass(), listeners);
-	
-	for (AActor* actor : listeners)
+	// Getting source position
+	FVector3f position = FVector3f( GetTransform().GetLocation() );;
+
+	// Getting listener rooms and position
+	AIS_Listener* listener = GetListener();
+	TArray<AIS_Room*> listenerRooms;
+	FVector3f listenerPos;
+
+	if (listener != nullptr)
 	{
-		_listeners.Add(Cast<AIS_Listener>(actor));
+		listenerRooms = listener->GetRooms();
+		listenerPos = FVector3f(listener->GetTransform().GetLocation());
+	}
+	else
+	{
+		return;
 	}
 
-	trees.Empty();
-
-	// Generating an ISTree for each listener in the level
-	for (AIS_Listener* listener : _listeners)
+	// If listener and source are not in the same room, IS generation is not executed
+	if ( !RoomsInCommon(listenerRooms, _rooms) )
 	{
-		FVector3f position;
+		return;
+	}
 
-		// If listener and source are in the same room, generate ISs using that room's surfaces
-		if ( RoomsInCommon(listener->GetRooms(), _rooms) )
-		{
-			// Since the listener and source are in the same room, IS generation uses the source's actual position
-			position = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
-		}
-		else
-		{
-			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Listener and source are in separate rooms"));
-			position = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
-		}
+	LastSourcePos = position;
 
-		LastSourcePos = FVector3f(this->GetTransform().GetLocation());
-
-		// Generate tree
-		if (EnableMultithreading)
-		{
-			GenerateISsMT(listener, position);
-		}
-		else
-		{
-			GenerateISsLinear(listener, position);
-		}
+	// Generate tree
+	if (EnableMultithreading)
+	{
+		GenerateISsMT(listenerPos, listenerRooms, position);
+	}
+	else
+	{
+		GenerateISsLinear(listenerPos, listenerRooms, position);
 	}
 }
 
 
 
-void AIS_Source::GenerateISsLinear(AIS_Listener* listener, FVector3f position)
+void AIS_Source::GenerateISsLinear(FVector3f listenerPos, TArray<AIS_Room*> listenerRooms, FVector3f position)
 {
 	// Set state to currently executing
 	currentlyExecuting = true;
-	
-	// Generates ISTree and adds it to the array
-	IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
-	trees.Add(listener, tree);
 
-	// If debug is active, the inactiveNodes Array is filled with indexes of ISs removed by optimizations, to check wether they work correctly
-	if (debugBeamTracing)
-	{
-		inactiveNodes.Empty();
-		TArray<IS*> nodes = tree.Nodes();
-
-		for (int i = 0 ; i < nodes.Num() ; i++)
+	// Call async task that will then execute the ISTree assignment
+	CreateISTreeTask(listenerRooms, position)
+		.Next([this, listenerPos](const IS_Tree& tree)
 		{
-			if (!nodes[i]->Valid)
-				inactiveNodes.Add(i);
-		}
-	}
+			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerPos, tree]()
+			{
+				//treesLock.Lock();
+				ISTree = tree;
+				//treesLock.Unlock();
+				
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
 
-	GenerateRP(listener);
+				GenerateRP(listenerPos);
+			});
+		});
+
+	/*
+	// Generates ISTree and adds it to the array
+	IS_Tree tree = IS_Tree(order, position, listenerRooms, WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
+
+	//treesLock.Lock();
+	ISTree = tree;
+	//treesLock.Unlock();
+
+	GenerateRP(listenerPos);
+	*/
 }
 
 
 
-void AIS_Source::GenerateISsMT(AIS_Listener* listener, FVector3f position)
+void AIS_Source::GenerateISsMT(FVector3f listenerPos, TArray<AIS_Room*> listenerRooms, FVector3f position)
 {
 	//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async IS generation"));
 
 	// Set state to currently executing
 	currentlyExecuting = true;
 
-	CreateISTreeTask(listener, position)
-		.Next([this, listener](const IS_Tree& tree)
+	// Call async task that will then execute the ISTree assignment
+	CreateISTreeTask(listenerRooms, position)
+		.Next([this, listenerPos](const IS_Tree& tree)
 		{
-			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, tree]()
+			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerPos, tree]()
 			{
-				treesLock.Lock();
-				trees.Add(listener, tree);
-				treesLock.Unlock();
+				//treesLock.Lock();
+				ISTree = tree;
+				//treesLock.Unlock();
 				
 				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async IS generation"));
 
-				GenerateRP(listener);
+				GenerateRP(listenerPos);
 			});
 		});
 }
 
 
 
-TFuture<IS_Tree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f position)
+TFuture<IS_Tree> AIS_Source::CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position)
 {
 	TSharedRef<TPromise<IS_Tree>> Promise = MakeShared<TPromise<IS_Tree>>();
 	TFuture<IS_Tree> Future = Promise->GetFuture();
 
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, position, Promise]() mutable
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerRooms, position, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(order, position, listener->GetRooms(), WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea, debugBeamTracing);
+		IS_Tree tree = IS_Tree(order, position, listenerRooms, WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
 		Promise->SetValue(tree);
 	});
 
@@ -190,69 +198,56 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(AIS_Listener* listener, FVector3f 
 
 
 
-void AIS_Source::GenerateAllReflectionPaths()
+void AIS_Source::GenerateRP(FVector3f listenerPos)
 {
-    if (trees.IsEmpty())
-        return;
-    
-	for (TPair<AIS_Listener*, IS_Tree>& pair : trees)
-	{
-		GenerateRP(pair.Key);
-	}
-}
-
-
-
-void AIS_Source::GenerateRP(AIS_Listener* listener)
-{
-	LastListenerPos = FVector3f(listener->GetTransform().GetLocation());
+	LastListenerPos = listenerPos;
 	
 	if (EnableMultithreading)
 	{
-		GenerateRPMT(listener);
+		GenerateRPMT(listenerPos);
 	}
 	else
 	{
-		GenerateRPLinear(listener);
+		GenerateRPLinear(listenerPos);
 	}
 }
 
 
 
-void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
+void AIS_Source::GenerateRPLinear(FVector3f listenerPos)
 {
 	// Set state to currently executing
 	currentlyExecuting = true;
-	
-	FDateTime StartTime = FDateTime::UtcNow();
-	
-	FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
-
-	TArray<IS*> nodes = trees[listener].Nodes();
 
 	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
 	SoundRaysBackBuffer->Empty();
-	
-	IS_SoundRay soundRay = IS_SoundRay();
 
-	int validPaths = 0;
-
-	for (IS* node : nodes)
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerPos, SoundRaysBackBuffer]()
 	{
-		FHitResult hit;
-		FCollisionQueryParams traceParams;
-		
-		TArray<FVector3f> intersections;
-		TArray<FVector3f> absorptions1;
-		TArray<FVector3f> absorptions2;
+		FDateTime StartTime = FDateTime::UtcNow();
 
-		int currentIndex;
-		IS* currentNode = nullptr;
-		FVector3f from;
-		FVector3f to;
+		//treesLock.Lock();
+		TArray<IS*> nodes = ISTree.Nodes();
+		//treesLock.Unlock();
 		
-		if (node->Valid)
+		IS_SoundRay soundRay = IS_SoundRay();
+
+		int validPaths = 0;
+
+		for (IS* node : nodes)
 		{
+			FHitResult hit;
+			FCollisionQueryParams traceParams;
+			
+			TArray<FVector3f> intersections;
+			TArray<FVector3f> absorptions1;
+			TArray<FVector3f> absorptions2;
+
+			int currentIndex;
+			IS* currentNode = nullptr;
+			FVector3f from;
+			FVector3f to;
+			
 			// Innocent until proven guilty
 			node->HasPath = true;
 
@@ -432,30 +427,48 @@ void AIS_Source::GenerateRPLinear(AIS_Listener* listener)
 				soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
 				soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
 
-				SoundRaysBackBuffer->AddRay(soundRay);
+				for (int i = SoundRaysBackBuffer->GetNumRays() - 1; i >= -1; i--)
+				{
+					if (i == -1)
+					{
+						SoundRaysBackBuffer->SoundRays.Insert(soundRay, 0);						
+					}
+					else if ( (listenerPos - SoundRaysBackBuffer->GetRay(i)->ISPosition).Length() < (listenerPos - soundRay.ISPosition).Length() )
+					{
+						SoundRaysBackBuffer->SoundRays.Insert(soundRay, i + 1);
+						break;
+					}
+				}
 			}
 			
 			node->Path = TArray(intersections);
 		}
-	}
 
-	int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
+		int totalISs = nodes.Num();
 
-	UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
-								  "%i ISs with a valid path out of %i total ISs\n"),
-								  TimeElapsedInMs, validPaths, nodes.Num());
+		AsyncTask(ENamedThreads::GameThread, [this, StartTime, validPaths, totalISs]()
+		{
+			int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
 
-	currentFrontBufferIs1 = !currentFrontBufferIs1;
-								  
-	DrawDebug();
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Finished async reflection paths generation"));
+			
+			UE_LOG(LogTemp, Display, TEXT("Reflection paths generated in %i milliseconds\n"
+										  "%i ISs with a valid path out of %i total ISs\n"),
+										  TimeElapsedInMs, validPaths, totalISs);
 
-	// Set state to not currently executing
-	currentlyExecuting = false;
+			currentFrontBufferIs1 = !currentFrontBufferIs1;
+			
+			DrawDebug();
+
+			// Set state to not currently executing
+			currentlyExecuting = false;
+		});
+	});
 }
 
 
 
-void AIS_Source::GenerateRPMT(AIS_Listener* listener)
+void AIS_Source::GenerateRPMT(FVector3f listenerPos)
 {
 	// Set state to currently executing
 	currentlyExecuting = true;
@@ -463,20 +476,21 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 	IS_SoundRayArray* SoundRaysBackBuffer = GetBackSoundRayBuffer();
 	SoundRaysBackBuffer->Empty();
 	
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listener, SoundRaysBackBuffer]()
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerPos, SoundRaysBackBuffer]()
 	{
 		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Beginning async reflection paths generation"));
 		
 		FDateTime StartTime = FDateTime::UtcNow();
-	
-		FVector3f listenerPos = FVector3f( listener->GetTransform().TransformPosition(FVector3d(0,0,0)) );
 
-		TArray<IS*> nodes = trees[listener].Nodes();
+		//treesLock.Lock();
+		TArray<IS*> nodes = ISTree.Nodes();
+		//treesLock.Unlock();
 
 		int validISs = 0;
 
 		FCriticalSection validISsLock;
 		FCriticalSection SoundRaysLock;
+		FCriticalSection PathLock;
 		
 		ParallelFor(nodes.Num(), [&](int32 index) mutable
 		{
@@ -493,198 +507,210 @@ void AIS_Source::GenerateRPMT(AIS_Listener* listener)
 			IS* currentNode = nullptr;
 			FVector3f from;
 			FVector3f to;
+			
+			// Innocent until proven guilty
+			node->HasPath = true;
 
-			if (node->Valid)
+			intersections.Empty();
+			absorptions1.Empty();
+			absorptions2.Empty();
+
+			intersections.Add(listenerPos);
+			absorptions1.Add(FVector3f::Zero());
+			absorptions2.Add(FVector3f::Zero());
+
+			currentIndex = node->Index;
+			from = listenerPos;
+
+			// Iterating all checks going up the IS tree
+			while (currentIndex != -1)
 			{
-				// Innocent until proven guilty
-				node->HasPath = true;
+				currentNode = nodes[currentIndex];
+				to = currentNode->Position;
 
-				intersections.Empty();
-				absorptions1.Empty();
-				absorptions2.Empty();
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
 
-				intersections.Add(listenerPos);
-				absorptions1.Add(FVector3f::Zero());
-				absorptions2.Add(FVector3f::Zero());
-
-				currentIndex = node->Index;
-				from = listenerPos;
-
-				// Iterating all checks going up the IS tree
-				while (currentIndex != -1)
+				if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
 				{
-					currentNode = nodes[currentIndex];
-					to = currentNode->Position;
+					AIS_ReflectorSurface* hitSurface = Cast<AIS_ReflectorSurface>( hit.GetActor() );
 
-					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Doing the line trace thing"));
+					//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
 
-					if ( GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
+					if ( hitSurface != nullptr && hitSurface == currentNode->Surface )
 					{
-						AIS_ReflectorSurface* hitSurface = Cast<AIS_ReflectorSurface>( hit.GetActor() );
-
-						//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Line trace thing hit something"));
-
-						if ( hitSurface != nullptr && hitSurface == currentNode->Surface )
-						{
-							intersections.Add( FVector3f( hit.ImpactPoint ) );
-							absorptions1.Add( FVector3f( hitSurface->Absorption125 , hitSurface->Absorption250 , hitSurface->Absorption500 ));
-							absorptions2.Add( FVector3f( hitSurface->Absorption1000 , hitSurface->Absorption2000 , hitSurface->Absorption4000 ));
-							from = FVector3f( hit.ImpactPoint );
-						}
-						else
-						{
-							//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("But the wrong thing"));
-							intersections.Add( FVector3f( hit.ImpactPoint ) );
-							node->HasPath = false;
-							break;
-						}
+						intersections.Add( FVector3f( hit.ImpactPoint ) );
+						absorptions1.Add( FVector3f( hitSurface->Absorption125 , hitSurface->Absorption250 , hitSurface->Absorption500 ));
+						absorptions2.Add( FVector3f( hitSurface->Absorption1000 , hitSurface->Absorption2000 , hitSurface->Absorption4000 ));
+						from = FVector3f( hit.ImpactPoint );
 					}
 					else
 					{
-						intersections.Add(to);
+						//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("But the wrong thing"));
+						intersections.Add( FVector3f( hit.ImpactPoint ) );
 						node->HasPath = false;
 						break;
 					}
-
-					currentIndex = currentNode->Parent;
+				}
+				else
+				{
+					intersections.Add(to);
+					node->HasPath = false;
+					break;
 				}
 
-				// Final check from last intersection to source
-				if (node->HasPath)
+				currentIndex = currentNode->Parent;
+			}
+
+			// Final check from last intersection to source
+			if (node->HasPath)
+			{
+				to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
+				
+				if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
 				{
-					to = FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) );
+					intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
+					absorptions1.Add(FVector3f::Zero());
+					absorptions2.Add(FVector3f::Zero());
+					node->HasPath = true;
+
+					validISsLock.Lock();
+					validISs++;
+					validISsLock.Unlock();
+				}
+				else
+				{
+					intersections.Add( FVector3f( hit.ImpactPoint ) );
+					node->HasPath = false;
+				}
+			}
+
+			// Adding sound ray if valid
+			if (node->HasPath)
+			{
+				IS_SoundRay soundRay = IS_SoundRay();
+
+				// Adding first point (source) and setting the position from which the sound arrives to listener
+				soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
+														-1, 1,
+														-1, 1,
+														-1, 1,
+														-1, 1,
+														-1, 1,
+														-1, 1
+											          ) );
+				soundRay.ISPosition = node->Position;
+
+				// Sound amplitude is reduced by 6 dB each time distance doubles
+				// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
+				float cumulativeDistance = 0.0f;
+				// Total drop in amplitude due to cumulative distance from source
+				float totalDrop;
+				// Drop in amplitude in last ray point
+				float lastAmplitudeDrop = 0.0f;
+				// Drop in amplitude in this segment of the ray (total - last)
+				float drop;
+				// Amplitudes arriving at the ray point 
+				float inAmp125;
+				float inAmp250;
+				float inAmp500;
+				float inAmp1000;
+				float inAmp2000;
+				float inAmp4000;
+
+				for (int i = intersections.Num() - 1; i > 1; i--)
+				{
+					// Adding the cumulative distance from source
+					cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
 					
-					if ( !GetWorld()->LineTraceSingleByChannel(hit, FVector(from + (to - from).GetSafeNormal() * 0.01f), FVector(to), TraceChannel, traceParams) )
-					{
-						intersections.Add( FVector3f( GetTransform().TransformPosition(FVector3d(0,0,0)) ) );
-						absorptions1.Add(FVector3f::Zero());
-						absorptions2.Add(FVector3f::Zero());
-						node->HasPath = true;
-
-						validISsLock.Lock();
-						validISs++;
-						validISsLock.Unlock();
-					}
-					else
-					{
-						intersections.Add( FVector3f( hit.ImpactPoint ) );
-						node->HasPath = false;
-					}
-				}
-
-				// Adding sound ray if valid
-				if (node->HasPath)
-				{
-					IS_SoundRay soundRay = IS_SoundRay();
-
-					// Adding first point (source) and setting the position from which the sound arrives to listener
-					soundRay.AddRayPoint( IS_SoundRayPoint( intersections[intersections.Num() - 1],
-															-1, 1,
-															-1, 1,
-															-1, 1,
-															-1, 1,
-															-1, 1,
-															-1, 1
-												          ) );
-					soundRay.ISPosition = node->Position;
-
-					// Sound amplitude is reduced by 6 dB each time distance doubles
-					// In this case, the starting amplitude is assumed to be at 1 meter (100 units)
-					float cumulativeDistance = 0.0f;
-					// Total drop in amplitude due to cumulative distance from source
-					float totalDrop;
-					// Drop in amplitude in last ray point
-					float lastAmplitudeDrop = 0.0f;
-					// Drop in amplitude in this segment of the ray (total - last)
-					float drop;
-					// Amplitudes arriving at the ray point 
-					float inAmp125;
-					float inAmp250;
-					float inAmp500;
-					float inAmp1000;
-					float inAmp2000;
-					float inAmp4000;
-
-					for (int i = intersections.Num() - 1; i > 1; i--)
-					{
-						// Adding the cumulative distance from source
-						cumulativeDistance += (intersections[i] - intersections[i-1]).Length();
-						
-						// Total drop in dB is log2( totalDistance / initialDistance )
-						// Where initialDistance is the distance of the original level (again, assumed to be 1 meter, 100 units)
-						totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
-						
-						// This is the factor by how much the level drops in this segment of the ray
-						drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
-						
-						// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
-						inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
-						
-						inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
-						
-						inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
-
-						inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
-
-						inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel2000 * drop;
-
-						inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop;
-
-						// Applying absorption to sound energy
-						float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
-
-						float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
-
-						float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
-
-						float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
-
-						float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
-
-						float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
-
-						// Adding the ray point
-						soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
-											  inAmp125,outAmp125,
-											  inAmp250,outAmp250,
-											  inAmp500,outAmp500,
-											  inAmp1000,outAmp1000,
-											  inAmp2000,outAmp2000,
-											  inAmp4000,outAmp4000)
-									);
-						
-						lastAmplitudeDrop = totalDrop;
-					}
-
-					// All operations regarding level drop due to distance are repeated for the last point
-					cumulativeDistance += (intersections[0] - intersections[1]).Length();
+					// Total drop in dB is log2( totalDistance / initialDistance )
+					// Where initialDistance is the distance of the original level (again, assumed to be 1 meter, 100 units)
 					totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
+					
+					// This is the factor by how much the level drops in this segment of the ray
 					drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
 					
-					inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
+					// Incoming level is the outgoing amplitude of the last point minus the drop due to distance
+					inAmp125 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel125 * drop;
 					
-					inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
+					inAmp250 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel250 * drop;
 					
-					inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
+					inAmp500 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel500 * drop;
 
-					inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
+					inAmp1000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel1000 * drop;
 
-					inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel2000 * drop;
+					inAmp2000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel2000 * drop;
 
-					inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel4000 * drop;
+					inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop;
 
-					// the final point and final percentage levels are set
-					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp125, -1, inAmp250, -1, inAmp500, -1, inAmp1000, -1, inAmp2000, -1, inAmp4000, -1) );
-					soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
-					soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
+					// Applying absorption to sound energy
+					float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
 
-					SoundRaysLock.Lock();
-					SoundRaysBackBuffer->AddRay(soundRay);
-					SoundRaysLock.Unlock();
+					float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
+
+					float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
+
+					float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
+
+					float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
+
+					float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
+
+					// Adding the ray point
+					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
+										  inAmp125,outAmp125,
+										  inAmp250,outAmp250,
+										  inAmp500,outAmp500,
+										  inAmp1000,outAmp1000,
+										  inAmp2000,outAmp2000,
+										  inAmp4000,outAmp4000)
+								);
+					
+					lastAmplitudeDrop = totalDrop;
+				}
+
+				// All operations regarding level drop due to distance are repeated for the last point
+				cumulativeDistance += (intersections[0] - intersections[1]).Length();
+				totalDrop = FMath::Log2( FMath::Max(cumulativeDistance, 100) / 100) * 6;
+				drop = FMath::Pow( 10, (lastAmplitudeDrop - totalDrop) / 20 );
+				
+				inAmp125 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel125 * drop;
+				
+				inAmp250 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel250 * drop;
+				
+				inAmp500 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel500 * drop;
+
+				inAmp1000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel1000 * drop;
+
+				inAmp2000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel2000 * drop;
+
+				inAmp4000 = soundRay.GetRayPoint(soundRay.GetNumRayPoints() - 1)->OutLevel4000 * drop;
+
+				// the final point and final percentage levels are set
+				soundRay.AddRayPoint( IS_SoundRayPoint(intersections[0], inAmp125, -1, inAmp250, -1, inAmp500, -1, inAmp1000, -1, inAmp2000, -1, inAmp4000, -1) );
+				soundRay.FinalLevels1 = FVector3f(inAmp125,inAmp250,inAmp500);
+				soundRay.FinalLevels2 = FVector3f(inAmp1000,inAmp2000,inAmp4000);
+
+				SoundRaysLock.Lock();
+				
+				for (int i = SoundRaysBackBuffer->GetNumRays() - 1; i >= -1; i--)
+				{
+					if (i == -1)
+					{
+						SoundRaysBackBuffer->SoundRays.Insert(soundRay, 0);						
+					}
+					else if ( (listenerPos - SoundRaysBackBuffer->GetRay(i)->ISPosition).Length() < (listenerPos - soundRay.ISPosition).Length() )
+					{
+						SoundRaysBackBuffer->SoundRays.Insert(soundRay, i + 1);
+						break;
+					}
 				}
 				
-				node->Path = TArray(intersections);
+				SoundRaysLock.Unlock();
 			}
+			
+			PathLock.Lock();
+			node->Path = TArray(intersections);
+			PathLock.Unlock();
 		});
 
 		int totalISs = nodes.Num();
@@ -775,82 +801,13 @@ void AIS_Source::UpdateCurrentRoom()
 }
 
 
-/*
-void AIS_Source::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	// Saving a backup of current rooms
-	TArray<AIS_Room*> RoomsBackup = _rooms;
-	// Disabling all collisions (the engine will reset them upon calling Super anyway)
-	SetActorEnableCollision(false);
-	// Restoring current rooms
-	_rooms = RoomsBackup;
-	
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	// Getting the name of the changed variable
-	FName MemberPropertyName = (PropertyChangedEvent.MemberProperty != nullptr) ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None;
-	
-	if (MemberPropertyName == "generateImageSources" || MemberPropertyName == "generateReflectionPaths" || MemberPropertyName == "playSound")
-	{
-		if (GetWorld()->WorldType != EWorldType::Editor)
-		{
-			if (generateImageSources == true)
-			{
-				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating ISs"));
-				generateImageSources = false;
-				GenerateISs();
-			}
-	
-			if (generateReflectionPaths == true)
-			{
-				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Generating reflections"));
-				generateReflectionPaths = false;
-				GenerateAllReflectionPaths();
-			}
-
-			if (playSound == true)
-			{
-				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Playing sound"));
-				playSound = false;
-				PlaySound();
-			}
-		}
-		else
-		{
-			// No IS generation and simulation unless the game is playing
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("Not in editor mode please!"));
-			generateImageSources = false;
-			generateReflectionPaths = false;
-			playSound = false;
-		}
-	}
-
-	// If the property to draw image sources is toggled
-	if (MemberPropertyName == "drawImageSources" || MemberPropertyName == "MinOrder" || MemberPropertyName == "MaxOrder" || MemberPropertyName == "drawPlaneProjection" || MemberPropertyName == "checkNode")
-	{
-		DrawDebug();
-	}
-
-	// Empty rooms
-	_rooms.Empty();
-	// Restore collisions (the engine will do its thing and all rooms will be back again)
-	SetActorEnableCollision(true);
-
-	
-	// P.S.: I know what I'm doing with the rooms seems out of place, but it's necessary.
-	// If you don't trust me, try removing the first three and last two lines of code and watch how nothing works
-	// when trying to call these functions from the edit page.
-
-}
-*/
-
 
 void AIS_Source::PlaySound()
 {
-	if (SoundEmitter != nullptr && _listeners.Num() > 0)
+	if (SoundEmitter != nullptr && GetListener() != nullptr)
 	{
 		// Getting the first listener (there should only be one)
-    	FVector3f ListenerPosition = FVector3f(_listeners[0]->GetTransform().GetLocation());
+    	FVector3f ListenerPosition = FVector3f(GetListener()->GetTransform().GetLocation());
 
 		// Spawning the original sound
 		UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
@@ -914,26 +871,25 @@ void AIS_Source::DrawDebug()
 
 	
 	// Draws original source and ISs
-	if (drawImageSources)
+	if (drawSourcesAndListener)
 	{
-		// Original source
-		DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
-		//DrawDebugSphere(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 25, 12, FColor::Red, true, -1, 0, 2);
+		// Draw original source
+		//DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
+		DrawDebugLine(GetWorld(), GetTransform().TransformPosition(FVector3d(SourceAndListenerSize,0,0)), GetTransform().TransformPosition(FVector3d(-SourceAndListenerSize,0,0)), FColor::Black, true, -1, 0, 4);
+		DrawDebugLine(GetWorld(), GetTransform().TransformPosition(FVector3d(0,SourceAndListenerSize,0)), GetTransform().TransformPosition(FVector3d(0,-SourceAndListenerSize,0)), FColor::Black, true, -1, 0, 4);
+		DrawDebugLine(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,SourceAndListenerSize)), GetTransform().TransformPosition(FVector3d(0,0,-SourceAndListenerSize)), FColor::Black, true, -1, 0, 4);
 
-		// Image Sources
-		if (trees.Num() > 0)
+		// Draw listener
+		if (GetListener() != nullptr)
+			DrawDebugSphere(GetWorld(), GetListener()->GetTransform().TransformPosition(FVector3d(0,0,0)), SourceAndListenerSize, 50, FColor::Black, true, -1, 0, 4);
+
+		// Draw image Sources
+		//treesLock.Lock();
+		for (IS* node : ISTree.Nodes())
 		{
-			// Getting the first listener (tests should only be performed with one)
-			TArray<AIS_Listener*> listeners; 
-			trees.GetKeys(listeners);
-    	
-			for (IS* node : trees[listeners[0]].Nodes())
-			{
-				if (node->Valid == true)
-					DrawDebugPoint(GetWorld(), FVector(node->Position), 10, FColor::Green, true, -1);
-					//DrawDebugSphere(GetWorld(), FVector(node->Position), 25, 12, FColor::Green, true, -1, 0, 2);
-			}
-		}	
+			DrawDebugPoint(GetWorld(), FVector(node->Position), ISSize, FColor::Black, true, -1);
+		}
+		//treesLock.Unlock();
 	}
 
 
@@ -996,12 +952,12 @@ void AIS_Source::DrawDebug()
 						// Building Niagara FX input parameters
 						// Ray position
 						Ray.Add(FVector(point->PointPosition));
-						AmplitudesLow.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
-						AmplitudesLow.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
-						AmplitudesMed.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
-						AmplitudesMed.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
-						AmplitudesHigh.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
-						AmplitudesHigh.Add(FMath::Max( 0.0, soundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
 					}
 
 					//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
@@ -1012,7 +968,7 @@ void AIS_Source::DrawDebug()
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesLow"), AmplitudesLow);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesMed"), AmplitudesMed);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesHigh"), AmplitudesHigh);
-						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), soundLevel);
+						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), visualSoundLevel);
 						NiagaraComp->Activate(true);
 					}
 
@@ -1086,27 +1042,23 @@ void AIS_Source::DrawDebug()
 	// Draws reflection path for the node to check
 	if (checkNode != -1)
 	{
-		if (trees.Num() > 0)
+		//treesLock.Lock();
+		TArray<IS*> nodes = ISTree.Nodes();
+		//treesLock.Unlock();
+		
+		if (checkNode >= 0 && checkNode < nodes.Num())
 		{
-			// Getting the first listener (tests should only be performed with one)
-			TArray<AIS_Listener*> listeners; 
-			trees.GetKeys(listeners);
-			TArray<IS*> nodes = trees[listeners[0]].Nodes();
-			
-			if (checkNode >= 0 && checkNode < nodes.Num())
+			IS* node = nodes[checkNode];
+			FColor color;
+
+			if (node->HasPath == true)
+				color = FColor::Black;
+			else
+				color = FColor::Red;
+
+			for (int i = 0; i < node->Path.Num() - 1; i++)
 			{
-				IS* node = nodes[checkNode];
-				FColor color;
-
-				if (node->HasPath == true)
-					color = FColor::Black;
-				else
-					color = FColor::Red;
-
-				for (int i = 0; i < node->Path.Num() - 1; i++)
-				{
-					DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), color, true, -1, 0, 2);
-				}
+				DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), color, true, -1, 0, 2);
 			}
 		}
 	}
@@ -1116,86 +1068,82 @@ void AIS_Source::DrawDebug()
 	// Draws beam tracing and clipping process for the node to check
 	if (checkNode != -1)
 	{
-		if (trees.Num() > 0)
+		//treesLock.Lock();
+		TArray<IS*> nodes = ISTree.Nodes();
+		//treesLock.Unlock();
+		
+		if (checkNode >= 0 && checkNode < nodes.Num() && nodes[checkNode]->Parent != -1)
 		{
-			// Getting the first listener (tests should only be performed with one)
-			TArray<AIS_Listener*> listeners; 
-			trees.GetKeys(listeners);
-			TArray<IS*> nodes = trees[listeners[0]].Nodes();
-			
-			if (checkNode >= 0 && checkNode < nodes.Num() && nodes[checkNode]->Parent != -1)
+			IS* node = nodes[checkNode];
+
+			// Displays the parent node index as a readonly field
+			parentNode = node->Parent;
+
+			// Highlights the IS in red
+			DrawDebugPoint(GetWorld(), FVector(node->Position), 15, FColor::Red, true, -1);
+			//DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
+
+			// Draws the resulting beam projection on the reflector
+			for (IS_ReflectorEdge edge : node->BeamPoints.Edges())
 			{
-				IS* node = nodes[checkNode];
+				DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Red, true, -1, 0, 2);
+			}
 
-				// Displays the parent node index as a readonly field
-				parentNode = node->Parent;
+			// Creates normal of plane on which the reflector lies
+			FVector3f planeNormal = FVector3f::CrossProduct(node->BeamPoints.Points()[1] - node->BeamPoints.Points()[0], node->BeamPoints.Points()[2] - node->BeamPoints.Points()[0]);
 
-				// Highlights the IS in red
-				DrawDebugPoint(GetWorld(), FVector(node->Position), 15, FColor::Red, true, -1);
-				//DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
+			// Draws the parent related gizmos
+			//Gizmos.color = Color.blue;
 
-				// Draws the resulting beam projection on the reflector
-				for (IS_ReflectorEdge edge : node->BeamPoints.Edges())
+			// Highlights the parent IS in blue
+			IS* nodeParent = nodes[node->Parent];
+			DrawDebugPoint(GetWorld(), FVector(nodeParent->Position), 15, FColor::Blue, true, -1);
+			//DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
+
+			// Draws parent beam points
+			for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
+			{
+				DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Blue, true, -1, 0, 2);
+			}
+
+			TArray<FVector3f> intersections;
+			TArray<int> checks;
+			FVector3f intersection;
+
+			// Saves projection intersections on reflector plane
+			for (FVector3f point : nodeParent->BeamPoints.Points())
+			{
+				int result = LinePlaneIntersection(&intersection, nodeParent->Position, point - nodeParent->Position, planeNormal, node->BeamPoints.Points()[0]);
+
+				if (result == -1)
 				{
-					DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Red, true, -1, 0, 2);
+					intersections.Add(point + (point - nodeParent->Position).GetSafeNormal() * 1000);
 				}
+				else
+				{
+					intersections.Add(intersection);
+				}
+				
+				checks.Add(result);
+			}
 
-				// Creates normal of plane on which the reflector lies
-				FVector3f planeNormal = FVector3f::CrossProduct(node->BeamPoints.Points()[1] - node->BeamPoints.Points()[0], node->BeamPoints.Points()[2] - node->BeamPoints.Points()[0]);
+			// Draws projection beams
+			for (FVector3f point : intersections)
+			{
+				DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(point + (point - nodeParent->Position).GetSafeNormal() * 1000), FColor::Blue, true, -1, 0, 2);
+			}
 
-				// Draws the parent related gizmos
-				//Gizmos.color = Color.blue;
-
-				// Highlights the parent IS in blue
-				IS* nodeParent = nodes[node->Parent];
-				DrawDebugPoint(GetWorld(), FVector(nodeParent->Position), 15, FColor::Blue, true, -1);
-				//DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
-
-				// Draws parent beam points
+			// Draws projection of beam points and beam edges upon the reflector plane
+			if (drawPlaneProjection)
+			{
 				for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
 				{
-					DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Blue, true, -1, 0, 2);
-				}
+					int indexA = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointA);
+					int indexB = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointB);
 
-				TArray<FVector3f> intersections;
-				TArray<int> checks;
-				FVector3f intersection;
-
-				// Saves projection intersections on reflector plane
-				for (FVector3f point : nodeParent->BeamPoints.Points())
-				{
-					int result = LinePlaneIntersection(&intersection, nodeParent->Position, point - nodeParent->Position, planeNormal, node->BeamPoints.Points()[0]);
-
-					if (result == -1)
+					if (checks[indexA] == 1 && checks[indexB] == 1)
 					{
-						intersections.Add(point + (point - nodeParent->Position).GetSafeNormal() * 1000);
-					}
-					else
-					{
-						intersections.Add(intersection);
-					}
-					
-					checks.Add(result);
-				}
-
-				// Draws projection beams
-				for (FVector3f point : intersections)
-				{
-					DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(point + (point - nodeParent->Position).GetSafeNormal() * 1000), FColor::Blue, true, -1, 0, 2);
-				}
-
-				// Draws projection of beam points and beam edges upon the reflector plane
-				if (drawPlaneProjection)
-				{
-					for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
-					{
-						int indexA = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointA);
-						int indexB = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointB);
-
-						if (checks[indexA] == 1 && checks[indexB] == 1)
-						{
-							DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, 2);
-						}
+						DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, 2);
 					}
 				}
 			}
@@ -1221,4 +1169,18 @@ IS_SoundRayArray* AIS_Source::GetBackSoundRayBuffer()
 		return &SoundRaysBuffer2;
 	else
 		return &SoundRaysBuffer1;
+}
+
+
+
+AIS_Listener* AIS_Source::GetListener()
+{
+	// Getting all listeners
+	TArray<AActor*> listeners; 
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIS_Listener::StaticClass(), listeners);
+	
+	if (listeners.Num() > 0)
+		return Cast<AIS_Listener>(listeners[0]);
+	else
+		return nullptr;
 }

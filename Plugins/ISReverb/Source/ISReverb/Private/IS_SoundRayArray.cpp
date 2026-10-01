@@ -10,11 +10,6 @@ void IS_SoundRayArray::Empty()
 	SoundRays.Empty();
 }
 
-void IS_SoundRayArray::AddRay(IS_SoundRay Ray)
-{
-	SoundRays.Add(Ray);
-}
-
 int IS_SoundRayArray::GetNumRays()
 {
 	return SoundRays.Num();

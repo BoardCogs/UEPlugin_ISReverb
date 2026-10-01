@@ -16,8 +16,6 @@ public:
 	
 	void Empty();
 	
-	void AddRay(IS_SoundRay Ray);
-	
 	int GetNumRays();
 
 	IS_SoundRay* GetRay(int i);

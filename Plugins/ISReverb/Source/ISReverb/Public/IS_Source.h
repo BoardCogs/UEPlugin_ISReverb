@@ -30,11 +30,8 @@ public:
     AIS_Source();
 
 private:
-    // All listeners in the scene (only one should be present)
-    TArray<AIS_Listener*> _listeners;
-    
-    // Image Sources trees, one for each listener
-    TMap<AIS_Listener*, IS_Tree> trees;
+    // Image Source tree
+    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, 0);
 
     // First buffer containing all simulated sound rays
     // If currentBuffer1 = true, it's the front buffer
@@ -52,6 +49,9 @@ private:
     // Array with all used Niagara effects
     TArray<UNiagaraComponent*> NiagaraEffects;
 
+    // Timer since BeginPlay was launched
+    float startupTimer;
+
     // Timer since last sound played
     float timer;
 
@@ -64,13 +64,18 @@ private:
     // State of execution, true if either IS or RP generation is running
     bool currentlyExecuting = false;
 
-    // Wether IS generation is cued to start as soon as the current operation finishes 
+public:
+
+    // Wether IS generation is cued to start as soon as the current operation finishes
+    UPROPERTY(BlueprintReadWrite)
     bool cueISGeneration = false;
 
     // Wether RP generation is cued to start as soon as the current operation finishes
+    UPROPERTY(BlueprintReadWrite)
     bool cueRPGeneration = false;
 
-public:
+    //[Header("System")]
+    
     /* The room(s) the source is currently in */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     FString Room;
@@ -79,37 +84,33 @@ public:
     UPROPERTY(EditAnywhere)
     TEnumAsByte<ECollisionChannel> TraceChannel;
 
-    /* The Niagara System to spawn to visualize sound rays */
+    /* The Niagara System to spawn to visualize sound rays (IS_SoundRaysFX should go here) */
     UPROPERTY(EditAnywhere)
     UNiagaraSystem* SoundRayFX;
 
-    /* The MateSound used to spawn audio */
+    /* The MetaSounds system used to spawn audio (IS_EarlyReflections should go here) */
     UPROPERTY(EditAnywhere)
     UMetaSoundSource* SoundEmitter;
 
-    /* The audio attenuation settings */
+    /* The audio attenuation settings (IS_SoundAttenuation should go here) */
     UPROPERTY(EditAnywhere)
     USoundAttenuation* SoundAttenuation;
+
+    //[Header("Sound")]
 
     /* The audio to be played */
     UPROPERTY(EditAnywhere)
     USoundWave* SoundWave;
 
+    /* Sound gain in dB for the played audio (also applies to reverb) */
+    UPROPERTY(EditAnywhere)
+    float soundGain = 0;
+
+    //[Header("Complexity and accuracy")]
+
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
-
-    /* Set to true to activate IS generation (only in play mode) */
-    //UPROPERTY(EditAnywhere)
-    //bool generateImageSources = false;
-
-    /* Set to true to activate path generation and checking (only in play mode) */
-    //UPROPERTY(EditAnywhere)
-    //bool generateReflectionPaths = false;
-
-    /* Set to true to play sound from source (only in play mode) */
-    //UPROPERTY(EditAnywhere)
-    //bool playSound = false;
 
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
@@ -119,37 +120,33 @@ public:
     UPROPERTY(EditAnywhere)
     int recomputeDistance = 150;
 
-    /* Sound gain in dB */
-    UPROPERTY(EditAnywhere)
-    float soundGain = 0;
-
     //[Header("Optimizations")]
 
-    /* Set true to remove all ISs that fall on the front side of their reflecting surface */
+    /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
     UPROPERTY(EditAnywhere)
     bool WrongSideOfReflector = true;
 
-    /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs */
+    /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
     bool BackSideSurfaces = true;
 
-    /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector */
+    /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector (recommended) */
     UPROPERTY(EditAnywhere)
     bool BeamTracing = true;
 
-    /* Set true to clip IS reflectors with their parent's projection upon them, for more accurate beam tracing */
+    /* Set true to clip IS reflectors with their parent's projection upon them, for more accurate beam tracing (recommended) */
     UPROPERTY(EditAnywhere)
     bool BeamClipping = true;
 
-    /* Projections with less are than this are discarded, set to <=0 to disable */
+    /* Beam projections with less area than this are discarded, set to <=0 to disable */
     UPROPERTY(EditAnywhere)
     float CutArea = 1000;
 
-    //[Header("Visualize")]
+    //[Header("Visualization")]
 
     /* Maximum sound pressure level at 1 meter from source, in dB. Used only for graphical representation to show perception of sound */
     UPROPERTY(EditAnywhere)
-    float soundLevel = 50;
+    float visualSoundLevel = 50;
 
     /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
@@ -161,7 +158,15 @@ public:
 
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
-    bool drawImageSources = false;
+    bool drawSourcesAndListener = false;
+
+    /* Set to true to visualize ISs */
+    UPROPERTY(EditAnywhere)
+    float ISSize = 10;
+    
+    /* Set to true to visualize ISs */
+    UPROPERTY(EditAnywhere)
+    float SourceAndListenerSize = 50;
 
     //[Header("Debug")]
 
@@ -176,14 +181,6 @@ public:
     /* The id of this IS node's parent */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     int parentNode = 0;
-
-    /* Set true to create invalid nodes (removed by optimizations) in the list below, to check for accurate removal */
-    UPROPERTY(EditAnywhere)
-    bool debugBeamTracing;
-
-    /* Nodes removed by optimization, list is always empty if the option above is set to false */
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    TArray<int> inactiveNodes = TArray<int>();
 
     FCriticalSection treesLock;
 
@@ -205,21 +202,17 @@ private:
     UFUNCTION(BlueprintCallable)
     void GenerateISs();
 
-    void GenerateISsLinear(AIS_Listener* listener, FVector3f position);
+    void GenerateISsLinear(FVector3f listenerPos, TArray<AIS_Room*> listenerRooms, FVector3f position);
 
-    void GenerateISsMT(AIS_Listener* listener, FVector3f position);
+    void GenerateISsMT(FVector3f listenerPos, TArray<AIS_Room*> listenerRooms, FVector3f position);
 
-    TFuture<IS_Tree> CreateISTreeTask(AIS_Listener* listener, FVector3f position);
-    
-    // Generates paths for sound reflections, checking if the sound reaches the listener
-    UFUNCTION(BlueprintCallable)
-    void GenerateAllReflectionPaths();
+    TFuture<IS_Tree> CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position);
 
-    void GenerateRP(AIS_Listener* listener);
+    void GenerateRP(FVector3f listenerPos);
 
-    void GenerateRPLinear(AIS_Listener* listener);
+    void GenerateRPLinear(FVector3f listenerPos);
 
-    void GenerateRPMT(AIS_Listener* listener);
+    void GenerateRPMT(FVector3f listenerPos);
 
     // Draws and deletes helpers for all debug purposes, according to the properties
     UFUNCTION(BlueprintCallable)
@@ -231,6 +224,8 @@ private:
     // Returns a pointer to the back sound ray buffer
     IS_SoundRayArray* GetBackSoundRayBuffer();
     
+    // Gets the listener from the scene. Only one should be present, if there's more listener, it selects the first
+    AIS_Listener* GetListener();
 
 
 public:
