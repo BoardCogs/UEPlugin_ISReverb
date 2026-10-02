@@ -162,7 +162,7 @@ public:
 
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
-    float ISSize = 10;
+    float ISSize = 7.5;
     
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
