@@ -127,7 +127,7 @@ void AIS_Source::GenerateISsLinear(FVector3f listenerPos, TArray<AIS_Room*> list
 	currentlyExecuting = true;
 
 	// Call async task that will then execute the ISTree assignment
-	CreateISTreeTask(listenerRooms, position)
+	CreateISTreeTask(listenerRooms, position, false)
 		.Next([this, listenerPos](const IS_Tree& tree)
 		{
 			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerPos, tree]()
@@ -164,7 +164,7 @@ void AIS_Source::GenerateISsMT(FVector3f listenerPos, TArray<AIS_Room*> listener
 	currentlyExecuting = true;
 
 	// Call async task that will then execute the ISTree assignment
-	CreateISTreeTask(listenerRooms, position)
+	CreateISTreeTask(listenerRooms, position, true)
 		.Next([this, listenerPos](const IS_Tree& tree)
 		{
 			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerPos, tree]()
@@ -182,14 +182,14 @@ void AIS_Source::GenerateISsMT(FVector3f listenerPos, TArray<AIS_Room*> listener
 
 
 
-TFuture<IS_Tree> AIS_Source::CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position)
+TFuture<IS_Tree> AIS_Source::CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position, bool parallelExecution)
 {
 	TSharedRef<TPromise<IS_Tree>> Promise = MakeShared<TPromise<IS_Tree>>();
 	TFuture<IS_Tree> Future = Promise->GetFuture();
 
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerRooms, position, Promise]() mutable
+	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerRooms, position, parallelExecution, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(order, position, listenerRooms, WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
+		IS_Tree tree = IS_Tree(order, position, listenerRooms, parallelExecution, WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
 		Promise->SetValue(tree);
 	});
 

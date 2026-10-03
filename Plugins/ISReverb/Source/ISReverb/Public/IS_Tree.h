@@ -17,7 +17,7 @@ public:
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea);
+    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool parallelExecution, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea);
 
 private:
 	// PROPERTIES

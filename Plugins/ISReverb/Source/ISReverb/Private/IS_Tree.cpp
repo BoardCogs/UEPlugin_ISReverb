@@ -2,7 +2,7 @@
 
 
 
-IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea)
+IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool parallelExecution, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea)
 {
     if (r == 0)
         return;
@@ -51,30 +51,52 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     {
         // Sets the first IS of the currently considered order of reflection
         firstNodeOfOrder.Add(i);
-        
-        ParallelFor(firstNodeOfOrder[order] - firstNodeOfOrder[order - 1],
-        [&](int32 index)
-        {
-            int p = firstNodeOfOrder[order - 1] + index;
-            
-            nodesLock.Lock();
-            IS* node = &_nodes[p];
-            nodesLock.Unlock();
-            
-            // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-            TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
 
-            // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
-            for (int s = 0 ; s < _sn ; s++)
+        if (parallelExecution)
+        {
+            ParallelFor(firstNodeOfOrder[order] - firstNodeOfOrder[order - 1],
+            [&](int32 index)
             {
-                if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, backSideLock, beamLock, areaLock, realISsLock) )
+                int p = firstNodeOfOrder[order - 1] + index;
+            
+                nodesLock.Lock();
+                IS* node = &_nodes[p];
+                nodesLock.Unlock();
+            
+                // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
+
+                // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
+                for (int s = 0 ; s < _sn ; s++)
                 {
-                    iLock.Lock();
-                    i++;
-                    iLock.Unlock();
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, backSideLock, beamLock, areaLock, realISsLock) )
+                    {
+                        iLock.Lock();
+                        i++;
+                        iLock.Unlock();
+                    }
+                }
+            });
+        }
+        else
+        {
+            for (int index = 0 ; index < firstNodeOfOrder[order] - firstNodeOfOrder[order - 1] ; index++)
+            {
+                int p = firstNodeOfOrder[order - 1] + index;
+                
+                IS* node = &_nodes[p];
+            
+                // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
+
+                // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
+                for (int s = 0 ; s < _sn ; s++)
+                {
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, backSideLock, beamLock, areaLock, realISsLock) )
+                        i++;
                 }
             }
-        });
+        }
     }
 
     int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();

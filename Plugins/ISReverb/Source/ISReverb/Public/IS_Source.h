@@ -31,7 +31,7 @@ public:
 
 private:
     // Image Source tree
-    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, 0);
+    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, false, 0);
 
     // First buffer containing all simulated sound rays
     // If currentBuffer1 = true, it's the front buffer
@@ -182,7 +182,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     int parentNode = 0;
 
-    FCriticalSection treesLock;
+    //FCriticalSection treesLock;
 
 
 
@@ -191,9 +191,6 @@ protected:
     virtual void BeginPlay() override;
 
     virtual void Tick(float DeltaSeconds) override;
-
-    // Called upon changes made in the editor.
-    //virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 
     
@@ -206,7 +203,7 @@ private:
 
     void GenerateISsMT(FVector3f listenerPos, TArray<AIS_Room*> listenerRooms, FVector3f position);
 
-    TFuture<IS_Tree> CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position);
+    TFuture<IS_Tree> CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position, bool parallelExecution);
 
     void GenerateRP(FVector3f listenerPos);
 
