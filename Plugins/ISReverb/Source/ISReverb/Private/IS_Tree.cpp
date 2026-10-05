@@ -29,12 +29,22 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
     // Creating the first order ISs
-    for (int i = 0; i < _sn ; i++, _realISs++)
+    for (int i = 0; i < _sn ; i++)
     {
-        FVector3f pos = sourcePos;
-        pos -= 2 * FVector3f::DotProduct(_surfaces[i]->Normal(),pos - _surfaces[i]->Origin()) * _surfaces[i]->Normal();
+        // Computing the position of the new IS by mirroring its parent along the reflecting surface
+        float d = FVector3f::DotProduct(_surfaces[i]->Normal(),sourcePos - _surfaces[i]->Origin());
+        
+        // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
+        if ( _wrongSideOfReflector && d <= 0 )
+        {
+            _wrongSide++;
+            continue;
+        }
+
+        FVector3f pos = sourcePos - 2 * d * _surfaces[i]->Normal();
 
         _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], IS_BeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
+        _realISs++;
     }
 
     FCriticalSection iLock;
@@ -47,7 +57,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
     FCriticalSection realISsLock;
     
     // Creating all ISs from second order onward
-    for (int i = _sn, order = 2 ; order <= _ro ; order++)
+    for (int i = _nodes.Num(), order = 2 ; order <= _ro ; order++)
     {
         // Sets the first IS of the currently considered order of reflection
         firstNodeOfOrder.Add(i);
@@ -142,8 +152,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
     
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
-    FVector3f pos = parentPos;
-    float d = FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() );
+    float d = FVector3f::DotProduct( surface->Normal() , parentPos - surface->Origin() );
 
 
 
@@ -161,7 +170,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
 
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
-    pos -= 2 * d * surface->Normal();
+    FVector3f pos = parentPos - 2 * d * surface->Normal();
 
 
 
