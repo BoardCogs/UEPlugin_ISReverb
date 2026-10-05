@@ -60,11 +60,12 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 int p = firstNodeOfOrder[order - 1] + index;
             
                 nodesLock.Lock();
-                IS* node = &_nodes[p];
+                FVector3f nodePos = _nodes[p].Position;
+                IS_BeamProjection nodeBeam = _nodes[p].BeamPoints;
                 nodesLock.Unlock();
             
                 // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam );
 
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
