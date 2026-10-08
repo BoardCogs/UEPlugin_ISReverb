@@ -68,11 +68,11 @@ public:
 
     // Wether IS generation is cued to start as soon as the current operation finishes
     UPROPERTY(BlueprintReadWrite)
-    bool cueISGeneration = false;
+    bool CueISGeneration = false;
 
     // Wether RP generation is cued to start as soon as the current operation finishes
     UPROPERTY(BlueprintReadWrite)
-    bool cueRPGeneration = false;
+    bool CueRPGeneration = false;
 
     //[Header("System")]
     
@@ -88,9 +88,13 @@ public:
     UPROPERTY(EditAnywhere)
     UNiagaraSystem* SoundRayFX;
 
-    /* The MetaSounds system used to spawn audio (IS_EarlyReflections should go here) */
+    /* The MetaSounds system used to spawn the original sound and individual reflections (IS_EarlyReflectionsIndividual should go here) */
     UPROPERTY(EditAnywhere)
     UMetaSoundSource* SoundEmitter;
+
+    /* The MetaSounds system used to play multiple reflections together (IS_EarlyReflectionsTogether should go here) */
+    UPROPERTY(EditAnywhere)
+    UMetaSoundSource* ReflectionsEmitter;
 
     /* The audio attenuation settings (IS_SoundAttenuation should go here) */
     UPROPERTY(EditAnywhere)
@@ -104,23 +108,35 @@ public:
 
     /* Sound gain in dB for the played audio (also applies to reverb) */
     UPROPERTY(EditAnywhere)
-    float soundGain = 0;
+    float SoundGain = 0;
 
     //[Header("Complexity and accuracy")]
 
-    /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
-    UPROPERTY(EditAnywhere)
-    bool EnableMultithreading;
-
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
-    int order;
+    int Order;
 
     /* The distance after which ISs or ray paths are recomputed */
     UPROPERTY(EditAnywhere)
-    int recomputeDistance = 150;
+    int RecomputeDistance = 150;
+
+    /* The beginning (included) of the range of early reflections to individually auralize. */
+    UPROPERTY(EditAnywhere)
+    int EarlyReflectionsMin = 0;
+
+    /* The end (included) of the range of early reflections to individually auralize */
+    UPROPERTY(EditAnywhere)
+    int EarlyReflectionsMax = 50;
+
+    /* Whether to individually play and spatialize reflections (performance heavy) or playing and spatializing them in clusters */
+    UPROPERTY(EditAnywhere)
+    bool ClusterReflections;
 
     //[Header("Optimizations")]
+    
+    /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
+    UPROPERTY(EditAnywhere)
+    bool EnableMultithreading;
 
     /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
     UPROPERTY(EditAnywhere)
@@ -146,7 +162,7 @@ public:
 
     /* Maximum sound pressure level at 1 meter from source, in dB. Used only for graphical representation to show perception of sound */
     UPROPERTY(EditAnywhere)
-    float visualSoundLevel = 50;
+    float VisualSoundLevel = 50;
 
     /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
@@ -158,7 +174,7 @@ public:
 
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
-    bool drawSourcesAndListener = false;
+    bool DrawSourcesAndListener = false;
 
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
@@ -172,15 +188,15 @@ public:
 
     /* Draws projection of beam points and beam edges upon the reflector plane */
     UPROPERTY(EditAnywhere)
-    bool drawPlaneProjection = true;
+    bool DrawPlaneProjection = true;
 
     /* The id of the IS node to be visualized for debug, set to -1 to disable */
     UPROPERTY(EditAnywhere)
-    int checkNode = -1;
+    int CheckNode = -1;
 
     /* The id of this IS node's parent */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    int parentNode = 0;
+    int ParentNode = 0;
 
     //FCriticalSection treesLock;
 

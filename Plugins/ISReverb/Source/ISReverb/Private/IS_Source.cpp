@@ -29,18 +29,18 @@ void AIS_Source::Tick(float DeltaSeconds)
 	}
 
 	// If source has moved
-	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > recomputeDistance || cueISGeneration )
+	if ( (FVector3f(this->GetTransform().GetLocation()) - LastSourcePos).Length() > RecomputeDistance || CueISGeneration )
 	{
 		if (!currentlyExecuting)
 		{
-			cueISGeneration = false;
-			cueRPGeneration = false;
+			CueISGeneration = false;
+			CueRPGeneration = false;
 			
 			GenerateISs();
 		}
 		else
 		{
-			cueISGeneration = true;
+			CueISGeneration = true;
 		}
 	}
 	else
@@ -50,17 +50,17 @@ void AIS_Source::Tick(float DeltaSeconds)
 			FVector3f listenerPos = FVector3f(GetListener()->GetTransform().GetLocation());
 
 			// If listener has moved
-			if ( (listenerPos - LastListenerPos).Length() > recomputeDistance || cueRPGeneration )
+			if ( (listenerPos - LastListenerPos).Length() > RecomputeDistance || CueRPGeneration )
 			{
 				if (!currentlyExecuting)
 				{
-					cueRPGeneration = false;
+					CueRPGeneration = false;
 				
 					GenerateRP(listenerPos);
 				}
 				else
 				{
-					cueRPGeneration = true;
+					CueRPGeneration = true;
 				}
 			}
 		}
@@ -189,7 +189,7 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(TArray<AIS_Room*> listenerRooms, F
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerRooms, position, parallelExecution, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(order, position, listenerRooms, parallelExecution, WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
+		IS_Tree tree = IS_Tree(Order, position, listenerRooms, parallelExecution, WrongSideOfReflector, BackSideSurfaces, BeamTracing, BeamClipping, CutArea);
 		Promise->SetValue(tree);
 	});
 
@@ -822,7 +822,7 @@ void AIS_Source::PlaySound()
 			float linearDrop = FMath::Pow( 10, -drop / 20 );
 
 			OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-			OriginalAudio->SetFloatParameter(TEXT("Gain"), soundGain);
+			OriginalAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
 			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
 			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), linearDrop);
 			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), linearDrop);
@@ -834,29 +834,132 @@ void AIS_Source::PlaySound()
 
 		// Getting the front sound ray buffer
 		IS_SoundRayArray* SoundRaysFrontBuffer = GetFrontSoundRayBuffer();
-		
-		// Spawning reverb audio
-		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
+
+		if (!ClusterReflections)
 		{
-			// Checking if the percentage of remaining energy is not below 0.001%, equivalent to -100 dB
-			if (ray.FinalLevels1.X < 0.00001 && ray.FinalLevels1.Y < 0.00001 && ray.FinalLevels1.Z < 0.00001 && ray.FinalLevels2.X < 0.00001 && ray.FinalLevels2.Y < 0.00001 && ray.FinalLevels2.Z < 0.00001)
-			{
-				continue;
-			}
+			int i = -1;
 			
-			UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(ray.ISPosition), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
-		
-			if (ReverbAudio)
+			// Spawning sound reflections individually
+			for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 			{
-				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-				ReverbAudio->SetFloatParameter(TEXT("Gain"), soundGain);
-				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
-				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalLevels1.X);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalLevels1.Y);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalLevels1.Z);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalLevels2.X);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalLevels2.Y);
-				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalLevels2.Z);
+				i++;
+				
+				// Checking if the percentage of remaining energy is not below 0.001%, equivalent to -100 dB
+				if (ray.FinalLevels1.X < 0.00001 && ray.FinalLevels1.Y < 0.00001 && ray.FinalLevels1.Z < 0.00001 && ray.FinalLevels2.X < 0.00001 && ray.FinalLevels2.Y < 0.00001 && ray.FinalLevels2.Z < 0.00001)
+					continue;
+
+				if (i < EarlyReflectionsMin)
+					continue;
+
+				if (i > EarlyReflectionsMax)
+					break;
+				
+				UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(ray.ISPosition), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
+			
+				if (ReverbAudio)
+				{
+					ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+					ReverbAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
+					ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
+					ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalLevels1.X);
+					ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalLevels1.Y);
+					ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalLevels1.Z);
+					ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalLevels2.X);
+					ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalLevels2.Y);
+					ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalLevels2.Z);
+				}
+			}
+		}
+		else
+		{
+			FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector().Normalize() );
+			listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0);
+
+			TArray<float> delays;
+			TArray<float> angles;
+			TArray<float> ref125;
+			TArray<float> ref250;
+			TArray<float> ref500;
+			TArray<float> ref1000;
+			TArray<float> ref2000;
+			TArray<float> ref4000;
+
+			// Spawning sound reflections in clusters
+			for (int i = 0 ; i < SoundRaysFrontBuffer->SoundRays.Num() ; )
+			{
+				if (i < EarlyReflectionsMin)
+				{
+					i++;
+					continue;
+				}
+
+				if (i > EarlyReflectionsMax)
+					break;
+
+				delays.Empty();
+				angles.Empty();
+				ref125.Empty();
+				ref250.Empty();
+				ref500.Empty();
+				ref1000.Empty();
+				ref2000.Empty();
+				ref4000.Empty();
+
+				float lastDelay;
+				
+				for (int j = 0 ; j < 5 ; j++, i++)
+				{
+					if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= EarlyReflectionsMax)
+					{
+						// Getting vector from listener to IS
+						FVector3f listenerToIS = SoundRaysFrontBuffer->SoundRays[i].ISPosition - ListenerPosition;
+
+						lastDelay = listenerToIS.Length() / (343 * 100);
+
+						// Setting delay based on distance
+						delays.Add(lastDelay);
+
+						// Setting azimuth (1 = right, -1 = left, 0 = front/back)
+						listenerToIS = FVector3f(listenerToIS.X, listenerToIS.Y, 0.0);
+						listenerToIS.Normalize();
+						angles.Add(listenerRight.Dot(listenerToIS));
+						
+						ref125.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.X);
+						ref250.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.Y);
+						ref500.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.Z);
+						ref1000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.X);
+						ref2000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.Y);
+						ref4000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.Z);
+					}
+					else
+					{
+						delays.Add(lastDelay);
+						angles.Add(0); 
+						ref125.Add(0);
+						ref250.Add(0); 
+						ref500.Add(0); 
+						ref1000.Add(0); 
+						ref2000.Add(0); 
+						ref4000.Add(0); 
+					}
+					
+				}
+
+				UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSound2D(this, ReflectionsEmitter);
+
+				if (ReverbAudio)
+				{
+					ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+					ReverbAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Delay"), delays);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Azimuth"), angles);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection125"), ref125);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection250"), ref250);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection500"), ref500);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection1000"), ref1000);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection2000"), ref2000);
+					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection4000"), ref4000);
+				}
 			}
 		}
 	}
@@ -871,7 +974,7 @@ void AIS_Source::DrawDebug()
 
 	
 	// Draws original source and ISs
-	if (drawSourcesAndListener)
+	if (DrawSourcesAndListener)
 	{
 		// Draw original source
 		//DrawDebugPoint(GetWorld(), GetTransform().TransformPosition(FVector3d(0,0,0)), 10, FColor::Red, true, -1);
@@ -952,12 +1055,12 @@ void AIS_Source::DrawDebug()
 						// Building Niagara FX input parameters
 						// Ray position
 						Ray.Add(FVector(point->PointPosition));
-						AmplitudesLow.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
-						AmplitudesLow.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
-						AmplitudesMed.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
-						AmplitudesMed.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
-						AmplitudesHigh.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
-						AmplitudesHigh.Add(FMath::Max( 0.0, visualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, VisualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel125 + point->InLevel250) / 2 ) ) );
+						AmplitudesLow.Add(FMath::Max( 0.0, VisualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel125 + point->OutLevel250) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, VisualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel500 + point->InLevel1000) / 2 ) ) );
+						AmplitudesMed.Add(FMath::Max( 0.0, VisualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel500 + point->OutLevel1000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, VisualSoundLevel + 20 * FMath::LogX( 10, (point->InLevel2000 + point->InLevel4000) / 2 ) ) );
+						AmplitudesHigh.Add(FMath::Max( 0.0, VisualSoundLevel + 20 * FMath::LogX( 10, (point->OutLevel2000 + point->OutLevel4000) / 2 ) ) );
 					}
 
 					//UNiagaraComponent* NiagaraComp = NiagaraActor->GetComponentByClass<UNiagaraComponent>();
@@ -968,7 +1071,7 @@ void AIS_Source::DrawDebug()
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesLow"), AmplitudesLow);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesMed"), AmplitudesMed);
 						UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayFloat(NiagaraComp, FName("AmplitudesHigh"), AmplitudesHigh);
-						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), visualSoundLevel);
+						NiagaraComp->SetFloatParameter(FName("InitialAmplitude"), VisualSoundLevel);
 						NiagaraComp->Activate(true);
 					}
 
@@ -1040,15 +1143,15 @@ void AIS_Source::DrawDebug()
 
 	
 	// Draws reflection path for the node to check
-	if (checkNode != -1)
+	if (CheckNode != -1)
 	{
 		//treesLock.Lock();
 		TArray<IS*> nodes = ISTree.Nodes();
 		//treesLock.Unlock();
 		
-		if (checkNode >= 0 && checkNode < nodes.Num())
+		if (CheckNode >= 0 && CheckNode < nodes.Num())
 		{
-			IS* node = nodes[checkNode];
+			IS* node = nodes[CheckNode];
 			FColor color;
 
 			if (node->HasPath == true)
@@ -1066,18 +1169,18 @@ void AIS_Source::DrawDebug()
 
 	
 	// Draws beam tracing and clipping process for the node to check
-	if (checkNode != -1)
+	if (CheckNode != -1)
 	{
 		//treesLock.Lock();
 		TArray<IS*> nodes = ISTree.Nodes();
 		//treesLock.Unlock();
 		
-		if (checkNode >= 0 && checkNode < nodes.Num() && nodes[checkNode]->Parent != -1)
+		if (CheckNode >= 0 && CheckNode < nodes.Num() && nodes[CheckNode]->Parent != -1)
 		{
-			IS* node = nodes[checkNode];
+			IS* node = nodes[CheckNode];
 
 			// Displays the parent node index as a readonly field
-			parentNode = node->Parent;
+			ParentNode = node->Parent;
 
 			// Highlights the IS in red
 			DrawDebugPoint(GetWorld(), FVector(node->Position), 15, FColor::Red, true, -1);
@@ -1134,7 +1237,7 @@ void AIS_Source::DrawDebug()
 			}
 
 			// Draws projection of beam points and beam edges upon the reflector plane
-			if (drawPlaneProjection)
+			if (DrawPlaneProjection)
 			{
 				for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
 				{
