@@ -52,9 +52,6 @@ private:
     // Timer since BeginPlay was launched
     float startupTimer;
 
-    // Timer since last sound played
-    float timer;
-
     // Last source position for IS generation
     FVector3f LastSourcePos;
 
@@ -120,17 +117,18 @@ public:
     UPROPERTY(EditAnywhere)
     int RecomputeDistance = 150;
 
-    /* The beginning (included) of the range of early reflections to individually auralize. */
+    /* The range of early reflections to be auralized individually */
     UPROPERTY(EditAnywhere)
-    int EarlyReflectionsMin = 0;
+    int IndividualReflections = 30;
 
-    /* The end (included) of the range of early reflections to individually auralize */
+    /* The beginning (included) of the range of early reflections to auralize in clusters.
+     * If it overlaps with IndividualReflections, the first reflections are auralized individually. */
     UPROPERTY(EditAnywhere)
-    int EarlyReflectionsMax = 50;
+    int ClusteredReflectionsMin = 0;
 
-    /* Whether to individually play and spatialize reflections (performance heavy) or playing and spatializing them in clusters */
+    /* The end (included) of the range of early reflections to auralize in clusters */
     UPROPERTY(EditAnywhere)
-    bool ClusterReflections;
+    int ClusteredReflectionsMax = 500;
 
     //[Header("Optimizations")]
     

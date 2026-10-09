@@ -65,17 +65,6 @@ void AIS_Source::Tick(float DeltaSeconds)
 			}
 		}
 	}
-
-	// TODO: move play sound logic elsewhere
-
-	// Playing sound regularly
-	timer += DeltaSeconds;
-	
-	if (timer >= 2)
-	{
-		timer = 0;
-		PlaySound();
-	}
 }
 
 
@@ -804,7 +793,7 @@ void AIS_Source::UpdateCurrentRoom()
 
 void AIS_Source::PlaySound()
 {
-	if (SoundEmitter != nullptr && GetListener() != nullptr)
+	if (SoundEmitter != nullptr && ReflectionsEmitter != nullptr && GetListener() != nullptr)
 	{
 		// Getting the first listener (there should only be one)
     	FVector3f ListenerPosition = FVector3f(GetListener()->GetTransform().GetLocation());
@@ -834,134 +823,131 @@ void AIS_Source::PlaySound()
 
 		// Getting the front sound ray buffer
 		IS_SoundRayArray* SoundRaysFrontBuffer = GetFrontSoundRayBuffer();
-
-		if (!ClusterReflections)
+		
+		// Spawning the first sound reflections individually
+		int i = 0;
+		
+		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 		{
-			int i = -1;
-			
-			// Spawning sound reflections individually
-			for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
+			if (i >= IndividualReflections)
+				break;
+
+			/*
+			// Checking if the percentage of remaining energy is not below 0.001%, equivalent to -100 dB
+			if (ray.FinalLevels1.X < 0.00001 && ray.FinalLevels1.Y < 0.00001 && ray.FinalLevels1.Z < 0.00001 && ray.FinalLevels2.X < 0.00001 && ray.FinalLevels2.Y < 0.00001 && ray.FinalLevels2.Z < 0.00001)
 			{
 				i++;
-				
-				// Checking if the percentage of remaining energy is not below 0.001%, equivalent to -100 dB
-				if (ray.FinalLevels1.X < 0.00001 && ray.FinalLevels1.Y < 0.00001 && ray.FinalLevels1.Z < 0.00001 && ray.FinalLevels2.X < 0.00001 && ray.FinalLevels2.Y < 0.00001 && ray.FinalLevels2.Z < 0.00001)
-					continue;
-
-				if (i < EarlyReflectionsMin)
-					continue;
-
-				if (i > EarlyReflectionsMax)
-					break;
-				
-				UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(ray.ISPosition), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
+				continue;
+			}
+			*/
 			
-				if (ReverbAudio)
-				{
-					ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-					ReverbAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
-					ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
-					ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalLevels1.X);
-					ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalLevels1.Y);
-					ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalLevels1.Z);
-					ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalLevels2.X);
-					ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalLevels2.Y);
-					ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalLevels2.Z);
-				}
-			}
-		}
-		else
-		{
-			FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector().Normalize() );
-			listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0);
-
-			TArray<float> delays;
-			TArray<float> angles;
-			TArray<float> ref125;
-			TArray<float> ref250;
-			TArray<float> ref500;
-			TArray<float> ref1000;
-			TArray<float> ref2000;
-			TArray<float> ref4000;
-
-			// Spawning sound reflections in clusters
-			for (int i = 0 ; i < SoundRaysFrontBuffer->SoundRays.Num() ; )
+			UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSoundAtLocation(this, SoundEmitter, FVector(ray.ISPosition), FRotator::ZeroRotator, 1, 1, 0, SoundAttenuation );
+		
+			if (ReverbAudio)
 			{
-				if (i < EarlyReflectionsMin)
+				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+				ReverbAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
+				ReverbAudio->SetFloatParameter(TEXT("Delay"), (ray.ISPosition - ListenerPosition).Length() / (343 * 100));
+				ReverbAudio->SetFloatParameter(TEXT("Reflection125"), ray.FinalLevels1.X);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection250"), ray.FinalLevels1.Y);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection500"), ray.FinalLevels1.Z);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection1000"), ray.FinalLevels2.X);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection2000"), ray.FinalLevels2.Y);
+				ReverbAudio->SetFloatParameter(TEXT("Reflection4000"), ray.FinalLevels2.Z);
+			}
+
+			i++;
+		}
+
+		// Spawning sound reflections in clusters
+		FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector().Normalize() );
+		listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0);
+
+		TArray<float> delays;
+		TArray<float> angles;
+		TArray<float> ref125;
+		TArray<float> ref250;
+		TArray<float> ref500;
+		TArray<float> ref1000;
+		TArray<float> ref2000;
+		TArray<float> ref4000;
+		
+		while ( i < SoundRaysFrontBuffer->SoundRays.Num() )
+		{
+			if (i < ClusteredReflectionsMin)
+			{
+				i++;
+				continue;
+			}
+
+			if (i > ClusteredReflectionsMax)
+				break;
+
+			delays.Empty();
+			angles.Empty();
+			ref125.Empty();
+			ref250.Empty();
+			ref500.Empty();
+			ref1000.Empty();
+			ref2000.Empty();
+			ref4000.Empty();
+
+			float lastDelay;
+			
+			for (int j = 0 ; j < 10 ; j++, i++)
+			{
+				if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= ClusteredReflectionsMax)
 				{
-					i++;
-					continue;
-				}
+					// Getting vector from listener to IS
+					FVector3f listenerToIS = SoundRaysFrontBuffer->SoundRays[i].ISPosition - ListenerPosition;
 
-				if (i > EarlyReflectionsMax)
-					break;
+					lastDelay = listenerToIS.Length() / (343 * 100);
 
-				delays.Empty();
-				angles.Empty();
-				ref125.Empty();
-				ref250.Empty();
-				ref500.Empty();
-				ref1000.Empty();
-				ref2000.Empty();
-				ref4000.Empty();
+					// Setting delay based on distance
+					delays.Add(lastDelay);
 
-				float lastDelay;
-				
-				for (int j = 0 ; j < 5 ; j++, i++)
-				{
-					if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= EarlyReflectionsMax)
-					{
-						// Getting vector from listener to IS
-						FVector3f listenerToIS = SoundRaysFrontBuffer->SoundRays[i].ISPosition - ListenerPosition;
-
-						lastDelay = listenerToIS.Length() / (343 * 100);
-
-						// Setting delay based on distance
-						delays.Add(lastDelay);
-
-						// Setting azimuth (1 = right, -1 = left, 0 = front/back)
-						listenerToIS = FVector3f(listenerToIS.X, listenerToIS.Y, 0.0);
-						listenerToIS.Normalize();
-						angles.Add(listenerRight.Dot(listenerToIS));
-						
-						ref125.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.X);
-						ref250.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.Y);
-						ref500.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.Z);
-						ref1000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.X);
-						ref2000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.Y);
-						ref4000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.Z);
-					}
-					else
-					{
-						delays.Add(lastDelay);
-						angles.Add(0); 
-						ref125.Add(0);
-						ref250.Add(0); 
-						ref500.Add(0); 
-						ref1000.Add(0); 
-						ref2000.Add(0); 
-						ref4000.Add(0); 
-					}
+					// Setting azimuth (1 = right, -1 = left, 0 = front/back)
+					listenerToIS = FVector3f(listenerToIS.X, listenerToIS.Y, 0.0);
+					listenerToIS.Normalize();
+					angles.Add(listenerRight.Dot(listenerToIS));
 					
+					ref125.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.X);
+					ref250.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.Y);
+					ref500.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels1.Z);
+					ref1000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.X);
+					ref2000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.Y);
+					ref4000.Add(SoundRaysFrontBuffer->SoundRays[i].FinalLevels2.Z);
 				}
-
-				UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSound2D(this, ReflectionsEmitter);
-
-				if (ReverbAudio)
+				else
 				{
-					ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-					ReverbAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Delay"), delays);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Azimuth"), angles);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection125"), ref125);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection250"), ref250);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection500"), ref500);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection1000"), ref1000);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection2000"), ref2000);
-					ReverbAudio->SetFloatArrayParameter(TEXT("Reflection4000"), ref4000);
+					delays.Add(lastDelay);
+					angles.Add(0); 
+					ref125.Add(0);
+					ref250.Add(0); 
+					ref500.Add(0); 
+					ref1000.Add(0); 
+					ref2000.Add(0); 
+					ref4000.Add(0); 
 				}
 			}
+
+			UAudioComponent* ReverbAudio = UGameplayStatics::SpawnSound2D(this, ReflectionsEmitter);
+
+			if (ReverbAudio)
+			{
+				ReverbAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+				ReverbAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Delay"), delays);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Azimuth"), angles);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Reflection125"), ref125);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Reflection250"), ref250);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Reflection500"), ref500);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Reflection1000"), ref1000);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Reflection2000"), ref2000);
+				ReverbAudio->SetFloatArrayParameter(TEXT("Reflection4000"), ref4000);
+			}
 		}
+		
 	}
 }
 
