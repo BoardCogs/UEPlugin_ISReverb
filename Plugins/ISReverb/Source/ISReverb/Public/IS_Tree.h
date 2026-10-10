@@ -17,7 +17,7 @@ public:
     // Creates a tree of Image Sources
     // n = number of surfaces
     // r = maximum order of reflections
-    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool parallelExecution, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea);
+    IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool parallelExecution, bool wrongSideOfReflector, bool preGenBackSideSurfaces, bool midGenBackSideSurfaces, bool beamTracing, bool beamClipping, float cutArea);
 
 private:
 	// PROPERTIES
@@ -40,10 +40,16 @@ private:
     int _wrongSide = 0;
 
 	// Wheter to optimize by not generating ISs on the front side of a reflector
-	bool _backSideSurfaces;
+	bool _preBackSideSurfaces;
 
 	// Amount of ISs saved by not generating ISs on the front side of a reflector
-	int _backSide = 0;
+	int _preBackSide = 0;
+
+	// Wheter to optimize by not generating ISs on the front side of a reflector
+	bool _midBackSideSurfaces;
+
+	// Amount of ISs saved by not generating ISs on the front side of a reflector
+	int _midBackSide = 0;
 
     // Wheter to optimize by not generating ISs for surfaces that fall outside the beam of their parent IS
     bool _beamTracing;
@@ -77,7 +83,7 @@ private:
     TArray<AIS_ReflectorSurface*> Surfaces();
 
     // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& backSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock);
+    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& preBackSideLock, FCriticalSection& midBackSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock);
 
 	// This function checks, given two surfaces, whether one of them is completely behind the other 
 	void CheckBackSideSurfaces();

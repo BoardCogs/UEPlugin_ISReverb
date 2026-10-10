@@ -31,7 +31,7 @@ public:
 
 private:
     // Image Source tree
-    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, false, 0);
+    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, false, false, 0);
 
     // First buffer containing all simulated sound rays
     // If currentBuffer1 = true, it's the front buffer
@@ -142,7 +142,11 @@ public:
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
-    bool BackSideSurfaces = true;
+    bool PreGenerationBackSideSurfaces = true;
+
+    /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
+    UPROPERTY(EditAnywhere)
+    bool MidGenerationBackSideSurfaces = false;
 
     /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector (recommended) */
     UPROPERTY(EditAnywhere)
