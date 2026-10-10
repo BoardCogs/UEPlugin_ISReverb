@@ -83,7 +83,7 @@ private:
     TArray<AIS_ReflectorSurface*> Surfaces();
 
     // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& preBackSideLock, FCriticalSection& midBackSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock);
+    bool CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, AIS_ReflectorSurface* parentSurface, FVector3f parentPos, IS_BeamProjection parentBeam, FCriticalSection& nodeLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& preBackSideLock, FCriticalSection& midBackSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock);
 
 	// This function checks, given two surfaces, whether one of them is completely behind the other 
 	void CheckBackSideSurfaces();
