@@ -207,13 +207,13 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
 
     // 3.5
-    // Checking that the two surfaces (in their entirety) are not one on the backside of the other
+    // Checking that the clipped parent surface isn't on the backside of the IS's surface
     if ( _midBackSideSurfaces )
     {
         FVector3f intersectionPoint;
         bool intersection = false;
         
-        // Checking if the edges of the parent's beam projection are intersected by the plane of this IS's surface
+        // Checking if the edges of the parent's clipped surface are intersected by the plane of this IS's surface
         for (IS_ReflectorEdge edge : parentBeam.Edges())
         {
             if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, surface->Normal(), surface->Points()[0] ) )
@@ -223,7 +223,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             }
         }
 
-        // If the parent's beam projection is on the backside of the IS surface
+        // If the parent's clipped surface is on the backside of the IS surface
         if ( !intersection && (parentBeam.Points()[0] - surface->Points()[0]).Dot(surface->Normal()) < 0 )
         {
             midBackSideLock.Lock();
@@ -504,6 +504,36 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             areaLock.Unlock();
             
             return false;   
+        }
+    }
+
+
+
+    // 3.5
+    // Checking that the clipped IS surface isn't on the backside of the parent's surface
+    if ( _midBackSideSurfaces )
+    {
+        FVector3f intersectionPoint;
+        bool intersection = false;
+        
+        // Checking if the edges of the clipped IS surface are intersected by the plane of the parent's surface
+        for (IS_ReflectorEdge edge : beam.Edges())
+        {
+            if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, parentSurface->Normal(), parentSurface->Points()[0] ) )
+            {
+                intersection = true;
+                break;
+            }
+        }
+
+        // If the clipped IS surface is on the backside of the parent's surface
+        if ( !intersection && (beam.Points()[0] - parentSurface->Points()[0]).Dot(parentSurface->Normal()) < 0 )
+        {
+            midBackSideLock.Lock();
+            _midBackSide++;
+            midBackSideLock.Unlock();
+
+            return false;
         }
     }
 
