@@ -610,7 +610,7 @@ void IS_Tree::CheckBackSideSurfaces()
             // If one surface is completely on one side of the other, memorize the information to avoid generating IS between them
             if ( isBehind )
             {
-                UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
+                //UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
                 
                 TArray<AIS_ReflectorSurface*> iBackSideSurfaces = TArray<AIS_ReflectorSurface*>();
 
