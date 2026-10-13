@@ -816,27 +816,33 @@ void AIS_Source::PlaySound()
 		// Getting the first listener (there should only be one)
     	FVector3f ListenerPosition = FVector3f(GetListener()->GetTransform().GetLocation());
 
-		// Spawning the original sound
-		UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
-		
-		if (OriginalAudio)
-		{
-			// Distance between source and listener
-			float distance = (FVector3f(this->GetTransform().GetLocation()) - ListenerPosition).Length();
-			// Distance converted to dB loss, roughly -6 dB each time distance doubles
-			float drop = FMath::Log2( FMath::Max(distance, 100) / 100) * 6;
-			// dB loss converted into percentage
-			float linearDrop = FMath::Pow( 10, -drop / 20 );
+		FHitResult hit;
+		FCollisionQueryParams traceParams;
 
-			OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
-			OriginalAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
-			OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
-			OriginalAudio->SetFloatParameter(TEXT("Reflection125"), linearDrop);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection250"), linearDrop);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection500"), linearDrop);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection1000"), linearDrop);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection2000"), linearDrop);
-			OriginalAudio->SetFloatParameter(TEXT("Reflection4000"), linearDrop);
+		if (DrySound && !GetWorld()->LineTraceSingleByChannel(hit, GetTransform().GetLocation(), FVector(ListenerPosition), TraceChannel, traceParams))
+		{
+			// Spawning the original sound
+			UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
+		
+			if (OriginalAudio)
+			{
+				// Distance between source and listener
+				float distance = (FVector3f(this->GetTransform().GetLocation()) - ListenerPosition).Length();
+				// Distance converted to dB loss, roughly -6 dB each time distance doubles
+				float drop = FMath::Log2( FMath::Max(distance, 100) / 100) * 6;
+				// dB loss converted into percentage
+				float linearDrop = FMath::Pow( 10, -drop / 20 );
+
+				OriginalAudio->SetWaveParameter(TEXT("Sound"), SoundWave);
+				OriginalAudio->SetFloatParameter(TEXT("Gain"), SoundGain);
+				OriginalAudio->SetFloatParameter(TEXT("Delay"), distance / (343 * 100));
+				OriginalAudio->SetFloatParameter(TEXT("Reflection125"), linearDrop);
+				OriginalAudio->SetFloatParameter(TEXT("Reflection250"), linearDrop);
+				OriginalAudio->SetFloatParameter(TEXT("Reflection500"), linearDrop);
+				OriginalAudio->SetFloatParameter(TEXT("Reflection1000"), linearDrop);
+				OriginalAudio->SetFloatParameter(TEXT("Reflection2000"), linearDrop);
+				OriginalAudio->SetFloatParameter(TEXT("Reflection4000"), linearDrop);
+			}
 		}
 
 		// Getting the front sound ray buffer
@@ -898,7 +904,7 @@ void AIS_Source::PlaySound()
 				continue;
 			}
 
-			if (i > ClusteredReflectionsMax)
+			if (i >= ClusteredReflectionsMax)
 				break;
 
 			delays.Empty();

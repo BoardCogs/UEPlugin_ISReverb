@@ -117,9 +117,13 @@ public:
     UPROPERTY(EditAnywhere)
     int RecomputeDistance = 150;
 
+    /* Wheter the dry sound is played or not */
+    UPROPERTY(EditAnywhere)
+    bool DrySound = true;
+
     /* The range of early reflections to be auralized individually */
     UPROPERTY(EditAnywhere)
-    int IndividualReflections = 30;
+    int IndividualReflections = 0;
 
     /* The beginning (included) of the range of early reflections to auralize in clusters.
      * If it overlaps with IndividualReflections, the first reflections are auralized individually. */
@@ -128,7 +132,7 @@ public:
 
     /* The end (included) of the range of early reflections to auralize in clusters */
     UPROPERTY(EditAnywhere)
-    int ClusteredReflectionsMax = 500;
+    int ClusteredReflectionsMax = 200;
 
     //[Header("Optimizations")]
     
@@ -158,7 +162,7 @@ public:
 
     /* Beam projections with less area than this are discarded, set to <=0 to disable */
     UPROPERTY(EditAnywhere)
-    float CutArea = 1000;
+    float CutArea = 2500;
 
     //[Header("Visualization")]
 
