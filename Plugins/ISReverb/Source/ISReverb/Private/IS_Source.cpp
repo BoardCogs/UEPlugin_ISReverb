@@ -382,12 +382,12 @@ void AIS_Source::GenerateRPLinear(FVector3f listenerPos)
 					inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop * airAbs4000;
 
 					// Applying absorption to sound energy
-					float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
-					float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
-					float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
-					float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
-					float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
-					float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
+					float outAmp125 = inAmp125 * FMath::Sqrt(1.0 - absorptions1[i-1].X);
+					float outAmp250 = inAmp250 * FMath::Sqrt(1.0 - absorptions1[i-1].Y);
+					float outAmp500 = inAmp500 * FMath::Sqrt(1.0 - absorptions1[i-1].Z);
+					float outAmp1000 = inAmp1000 * FMath::Sqrt(1.0 - absorptions2[i-1].X);
+					float outAmp2000 = inAmp2000 * FMath::Sqrt(1.0 - absorptions2[i-1].Y);
+					float outAmp4000 = inAmp4000 * FMath::Sqrt(1.0 - absorptions2[i-1].Z);
 
 					// Adding the ray point
 					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],
@@ -654,12 +654,12 @@ void AIS_Source::GenerateRPMT(FVector3f listenerPos)
 					inAmp4000 = soundRay.GetRayPoint(intersections.Num() - 1 - i)->OutLevel4000 * drop * airAbs4000;
 
 					// Applying absorption to sound energy
-					float outAmp125 = inAmp125 * (1.0 - absorptions1[i-1].X);
-					float outAmp250 = inAmp250 * (1.0 - absorptions1[i-1].Y);
-					float outAmp500 = inAmp500 * (1.0 - absorptions1[i-1].Z);
-					float outAmp1000 = inAmp1000 * (1.0 - absorptions2[i-1].X);
-					float outAmp2000 = inAmp2000 * (1.0 - absorptions2[i-1].Y);
-					float outAmp4000 = inAmp4000 * (1.0 - absorptions2[i-1].Z);
+					float outAmp125 = inAmp125 * FMath::Sqrt(1.0 - absorptions1[i-1].X);
+					float outAmp250 = inAmp250 * FMath::Sqrt(1.0 - absorptions1[i-1].Y);
+					float outAmp500 = inAmp500 * FMath::Sqrt(1.0 - absorptions1[i-1].Z);
+					float outAmp1000 = inAmp1000 * FMath::Sqrt(1.0 - absorptions2[i-1].X);
+					float outAmp2000 = inAmp2000 * FMath::Sqrt(1.0 - absorptions2[i-1].Y);
+					float outAmp4000 = inAmp4000 * FMath::Sqrt(1.0 - absorptions2[i-1].Z);
 
 					// Adding the ray point
 					soundRay.AddRayPoint( IS_SoundRayPoint(intersections[i - 1],

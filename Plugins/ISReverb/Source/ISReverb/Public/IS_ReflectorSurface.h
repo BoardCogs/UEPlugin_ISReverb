@@ -33,6 +33,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool Visible = false;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    bool VisibleInRayTracing = true;
 
 	/* 125 Hz absorption coefficient */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))

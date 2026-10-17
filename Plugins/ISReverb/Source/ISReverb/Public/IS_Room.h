@@ -32,6 +32,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool VisibleSurfaces = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool VisibleSurfacesInRayTracing = true;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<AIS_ReflectorSurface*> Surfaces;
