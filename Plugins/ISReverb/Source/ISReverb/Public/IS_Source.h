@@ -182,29 +182,37 @@ public:
     UPROPERTY(EditAnywhere)
     bool DrawSourcesAndListener = false;
 
-    /* Set to true to visualize ISs */
+    /* Sets the size of ISs when drawn */
     UPROPERTY(EditAnywhere)
     float ISSize = 7.5;
     
-    /* Set to true to visualize ISs */
+    /* Sets the size of source and listener when drawn */
     UPROPERTY(EditAnywhere)
     float SourceAndListenerSize = 50;
 
     //[Header("Debug")]
 
-    /* Draws projection of beam points and beam edges upon the reflector plane */
-    UPROPERTY(EditAnywhere)
-    bool DrawPlaneProjection = true;
-
     /* The id of the IS node to be visualized for debug, set to -1 to disable */
     UPROPERTY(EditAnywhere)
     int CheckNode = -1;
 
+    /* Draws projection of beam points and beam edges upon the reflector plane */
+    UPROPERTY(EditAnywhere)
+    bool DrawPlaneProjection = true;
+
+    /* Draws the ray generated from this IS.
+     * Drawn in black if the visibility tests succeeded,
+     * otherwise the partial ray will be drawn in red up until the segment that failed the visibility test.*/
+    UPROPERTY(EditAnywhere)
+    bool DrawRay = true;
+
+    /* Sets the size of lines used to draw the surfaces, beam and ray */
+    UPROPERTY(EditAnywhere)
+    float LineSize = 4;
+
     /* The id of this IS node's parent */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     int ParentNode = 0;
-
-    //FCriticalSection treesLock;
 
 
 

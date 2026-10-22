@@ -1153,7 +1153,7 @@ void AIS_Source::DrawDebug()
 
 	
 	// Draws reflection path for the node to check
-	if (CheckNode != -1)
+	if (CheckNode != -1 && DrawRay)
 	{
 		//treesLock.Lock();
 		TArray<IS*> nodes = ISTree.Nodes();
@@ -1171,7 +1171,7 @@ void AIS_Source::DrawDebug()
 
 			for (int i = 0; i < node->Path.Num() - 1; i++)
 			{
-				DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), color, true, -1, 0, 2);
+				DrawDebugLine(GetWorld(), FVector(node->Path[i]), FVector(node->Path[i + 1]), color, true, -1, 0, LineSize);
 			}
 		}
 	}
@@ -1188,18 +1188,19 @@ void AIS_Source::DrawDebug()
 		if (CheckNode >= 0 && CheckNode < nodes.Num() && nodes[CheckNode]->Parent != -1)
 		{
 			IS* node = nodes[CheckNode];
+			IS* nodeParent = nodes[node->Parent];
 
 			// Displays the parent node index as a readonly field
 			ParentNode = node->Parent;
 
-			// Highlights the IS in red
-			DrawDebugPoint(GetWorld(), FVector(node->Position), 15, FColor::Red, true, -1);
+			// Highlights the selected IS in red
+			DrawDebugPoint(GetWorld(), FVector(node->Position), ISSize*2, FColor::Red, true, -1);
 			//DrawDebugSphere(GetWorld(), FVector(node->Position), 30, 16, FColor::Red, true, -1, 0, 2);
 
 			// Draws the resulting beam projection on the reflector
 			for (IS_ReflectorEdge edge : node->BeamPoints.Edges())
 			{
-				DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Red, true, -1, 0, 2);
+				DrawDebugLine(GetWorld(), FVector(edge.PointA - (edge.PointA - nodeParent->Position).GetSafeNormal() * 2 ), FVector(edge.PointB - (edge.PointB - nodeParent->Position).GetSafeNormal() * 2), FColor::Red, true, -1, 0, LineSize*1.3f);
 			}
 
 			// Creates normal of plane on which the reflector lies
@@ -1209,14 +1210,13 @@ void AIS_Source::DrawDebug()
 			//Gizmos.color = Color.blue;
 
 			// Highlights the parent IS in blue
-			IS* nodeParent = nodes[node->Parent];
-			DrawDebugPoint(GetWorld(), FVector(nodeParent->Position), 15, FColor::Blue, true, -1);
+			DrawDebugPoint(GetWorld(), FVector(nodeParent->Position), ISSize*2, FColor::Blue, true, -1);
 			//DrawDebugSphere(GetWorld(), FVector(nodeParent->Position), 30, 16, FColor::Blue, true, -1, 0, 2);
 
 			// Draws parent beam points
 			for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
 			{
-				DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Blue, true, -1, 0, 2);
+				DrawDebugLine(GetWorld(), FVector(edge.PointA), FVector(edge.PointB), FColor::Blue, true, -1, 0, LineSize);
 			}
 
 			TArray<FVector3f> intersections;
@@ -1240,10 +1240,10 @@ void AIS_Source::DrawDebug()
 				checks.Add(result);
 			}
 
-			// Draws projection beams
+			// Draws projection beam
 			for (FVector3f point : intersections)
 			{
-				DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(point + (point - nodeParent->Position).GetSafeNormal() * 1000), FColor::Blue, true, -1, 0, 2);
+				DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(point /* + (point - nodeParent->Position).GetSafeNormal() * 1000 */), FColor::Blue, true, -1, 0, LineSize);
 			}
 
 			// Draws projection of beam points and beam edges upon the reflector plane
@@ -1256,7 +1256,7 @@ void AIS_Source::DrawDebug()
 
 					if (checks[indexA] == 1 && checks[indexB] == 1)
 					{
-						DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, 2);
+						DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, LineSize);
 					}
 				}
 			}
