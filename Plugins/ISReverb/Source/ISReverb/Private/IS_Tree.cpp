@@ -257,14 +257,18 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         FVector3f secondIntersection;
         // List of edges that don't need an intersection to be tested (to avoid repeated intersection detection on edge extremes)
         TArray<IS_ReflectorEdge> blackList = TArray<IS_ReflectorEdge>();
+        // Edge counter
         int e = 0;
 
         
-        // For all planes of projection, check for intersections with the edges of this surface
+        // For all beam planes, check for intersections with the edges of this surface
         for (FVector3f normal : projectionPlanesNormals)
         {
             blackList.Empty();
             e = 0;
+
+            // If true, the beam plane has no intersections with all edges of the (clipped) surface
+            bool noIntersections = true;
 
             while (e < beam.Edges().Num())
             {
@@ -279,6 +283,9 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 // Checks if the edge intersects the plane
                 if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentPos ) )
                 {
+                    // There's been at least one valid intersection
+                    noIntersections = false;
+                    
                     // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
                     bool doNothing = false;
                     // Wether the intersection is on the extreme of the edge and the edge is entirely out of the projection
@@ -343,7 +350,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                                     if (intersectionOnExtreme)
                                     {
                                         // Both this edge and the other are entirely out of the projection beam
-                                        // Both are removed and a single edge connecting theit opposite extremes is created
+                                        // Both are removed and a single edge connecting their opposite extremes is created
 
                                         beam.RemovePoint(outPoint);
 
@@ -367,11 +374,6 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                                         blackList.Add( beam.AddEdge(intersection, inPoint) );
                                         blackList.Add( beam.AddEdge(intersection, otherPoint) );
                                     }
-                                }
-                                // The second intersection is near the outpoint
-                                else if ((intersection - outPoint).Length() <= 0.02f)
-                                {
-                                    blackList.Add(edge);
                                 }
                                 // The second intersection is not on the edge extremes
                                 else
@@ -435,11 +437,6 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                         }
                         else
                         {
-                            /*
-                            blackList.Add(edge);
-                            e++;
-                            */
-
                             // If the other edge has not been found, some approximation error has occurred
                             // This means the projection is extremely small -> let's remove it altogether
                             beamLock.Lock();
@@ -461,6 +458,20 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     e++;
                 }
             }
+
+            // If this beam plane has had no intersections with the entire clipped surface
+            if (noIntersections)
+            {
+                // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
+                if ( FVector3f::DotProduct( (beam.Points()[0] - parentPos).GetSafeNormal() , normal) < 0 )
+                {
+                    beamLock.Lock();
+                    _beam++;
+                    beamLock.Unlock();
+
+                    return false;
+                }
+            }
         }
 
         // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
@@ -473,13 +484,14 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             return false;
         }
 
+        /*
         // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
         for (FVector3f point : beam.Points())
         {
             for (FVector3f normal : projectionPlanesNormals)
             {
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( (point - parentPos).GetSafeNormal() , normal) < -1 )
+                if ( FVector3f::DotProduct( (point - parentPos).GetSafeNormal() , normal) < -1e-6 )
                 {
                     beamLock.Lock();
                     _beam++;
@@ -489,6 +501,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
             }
         }
+        */
     }
 
 
