@@ -1220,7 +1220,7 @@ void AIS_Source::DrawDebug()
 			}
 
 			TArray<FVector3f> intersections;
-			TArray<int> checks;
+			bool allIntersectionsFound = true;
 			FVector3f intersection;
 
 			// Saves projection intersections on reflector plane
@@ -1230,34 +1230,37 @@ void AIS_Source::DrawDebug()
 
 				if (result == -1)
 				{
-					intersections.Add(point + (point - nodeParent->Position).GetSafeNormal() * 1000);
+					allIntersectionsFound = false;
+					break;
 				}
 				else
 				{
 					intersections.Add(intersection);
 				}
-				
-				checks.Add(result);
 			}
 
 			// Draws projection beam
-			for (FVector3f point : intersections)
+			for (int i = 0; i < nodeParent->BeamPoints.Points().Num(); i++)
 			{
-				DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(point /* + (point - nodeParent->Position).GetSafeNormal() * 1000 */), FColor::Blue, true, -1, 0, LineSize);
+				if (allIntersectionsFound && i < intersections.Num())
+				{
+					DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(intersections[i]), FColor::Blue, true, -1, 0, LineSize);	
+				}
+				else
+				{
+					DrawDebugLine(GetWorld(), FVector(nodeParent->Position), FVector(nodeParent->BeamPoints.Points()[i] + (nodeParent->BeamPoints.Points()[i] - nodeParent->Position).GetSafeNormal() * 5000), FColor::Blue, true, -1, 0, LineSize);
+				}
 			}
 
 			// Draws projection of beam points and beam edges upon the reflector plane
-			if (DrawPlaneProjection)
+			if (DrawPlaneProjection && allIntersectionsFound)
 			{
 				for (IS_ReflectorEdge edge : nodeParent->BeamPoints.Edges())
 				{
 					int indexA = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointA);
 					int indexB = nodeParent->BeamPoints.Points().IndexOfByKey(edge.PointB);
-
-					if (checks[indexA] == 1 && checks[indexB] == 1)
-					{
-						DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, LineSize);
-					}
+					
+					DrawDebugLine(GetWorld(), FVector(intersections[indexA]), FVector(intersections[indexB]), FColor::Blue, true, -1, 0, LineSize);
 				}
 			}
 		}

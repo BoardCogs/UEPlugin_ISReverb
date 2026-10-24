@@ -292,7 +292,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     bool intersectionOnExtreme = false;
 
                     // Check if intersection is on the edge extremes
-                    if ((intersection - edge.PointA).Length() < 0.02f)
+                    if ((intersection - edge.PointA).Length() <= 0.02f)
                     {
                         if ( FVector3f::DotProduct( normal, (edge.PointB - parentPos).GetSafeNormal() ) >= 0 )
                         {
@@ -307,7 +307,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             intersectionOnExtreme = true;
                         }
                     }
-                    else if ((intersection - edge.PointB).Length() < 0.02f)
+                    else if ((intersection - edge.PointB).Length() <= 0.02f)
                     {
                         if ( FVector3f::DotProduct( normal, (edge.PointA - parentPos).GetSafeNormal() ) >= 0 )
                         {
@@ -345,7 +345,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, parentPos))
                             {
                                 // The second intersection is near the other point
-                                if ((secondIntersection - otherPoint).Length() < 0.02f)
+                                if ((secondIntersection - otherPoint).Length() <= 0.02f)
                                 {
                                     if (intersectionOnExtreme)
                                     {
@@ -376,9 +376,10 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                                     }
                                 }
                                 // The second intersection is near the outpoint
-                                else if ((secondIntersection - outPoint).Length() < 0.02f)
+                                else if ((secondIntersection - outPoint).Length() <= 0.02f)
                                 {
                                     blackList.Add(edge);
+                                    blackList.Add(otherEdge);
                                 }
                                 // The second intersection is not on the edge extremes
                                 else
@@ -438,7 +439,6 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             }
 
                             e = 0;
-
                         }
                         else
                         {
@@ -495,7 +495,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             for (FVector3f normal : projectionPlanesNormals)
             {
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( ((point + normal * 0.02f) - parentPos).GetSafeNormal() , normal) < -1e-6 )
+                if ( FVector3f::DotProduct( ((point + normal * 0.05f) - parentPos).GetSafeNormal() , normal) < -1e-6 )
                 {
                     beamLock.Lock();
                     _beam++;
@@ -704,7 +704,7 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
         else if (length >= lineVec.Length())
             *intersection = linePoint + lineVec;
 
-        return length > -0.02f && length < lineVec.Length() + 0.02f;
+        return length >= -0.02f && length <= lineVec.Length() + 0.02f;
     }
     else
     {
