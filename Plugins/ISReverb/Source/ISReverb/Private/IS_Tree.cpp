@@ -467,35 +467,23 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             // If this beam plane has had no intersections with the entire clipped surface
             if (noIntersections)
             {
-                // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( (beam.Points()[0] - parentPos).GetSafeNormal() , normal) < 0 )
+                for (FVector3f point : beam.Points())
                 {
-                    beamLock.Lock();
-                    _beam++;
-                    beamLock.Unlock();
+                    // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
+                    if ( FVector3f::DotProduct( ((point + normal * 0.1f) - parentPos).GetSafeNormal() , normal) < -1e-6 )
+                    {
+                        beamLock.Lock();
+                        _beam++;
+                        beamLock.Unlock();
 
-                    return false;
+                        return false;
+                    }
                 }
             }
-        }
-
-        // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
-        if (beam.Points().Num() <= 2 || beam.Edges().Num() <= 2)
-        {
-            beamLock.Lock();
-            _beam++;
-            beamLock.Unlock();
-            
-            return false;
-        }
-        
-        // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
-        for (FVector3f point : beam.Points())
-        {
-            for (FVector3f normal : projectionPlanesNormals)
+            else
             {
-                // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( ((point + normal * 0.05f) - parentPos).GetSafeNormal() , normal) < -1e-6 )
+                // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
+                if (beam.Points().Num() <= 2 || beam.Edges().Num() <= 2)
                 {
                     beamLock.Lock();
                     _beam++;
@@ -656,7 +644,7 @@ TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamPro
     TArray<FVector3f> normals = TArray<FVector3f>();
     for (IS_ReflectorEdge e : BeamProjection.Edges())
     {
-        FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position);
+        FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position).GetSafeNormal();
 
         normal = CheckNormal(normal, e.PointA, e.PointB, BeamProjection.Points()) ? normal : -normal;
 

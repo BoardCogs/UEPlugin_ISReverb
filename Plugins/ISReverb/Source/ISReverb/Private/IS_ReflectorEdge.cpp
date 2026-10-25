@@ -38,7 +38,7 @@ bool IS_ReflectorEdge::IsVoid()
 // Equal-to operator
 bool operator==(const IS_ReflectorEdge& lhs, const IS_ReflectorEdge& rhs)
 {
-	return lhs.PointA == rhs.PointA && lhs.PointB == rhs.PointB;
+	return (lhs.PointA == rhs.PointA && lhs.PointB == rhs.PointB) || (lhs.PointB == rhs.PointA && lhs.PointA == rhs.PointB);
 }
 
 
