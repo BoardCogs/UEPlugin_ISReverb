@@ -78,7 +78,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 nodesLock.Unlock();
             
                 // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam );
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam, nodeSurface->Normal() );
 
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
@@ -101,7 +101,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 IS* node = &_nodes[p];
             
                 // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints, node->Surface->Normal() );
 
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
@@ -243,6 +243,8 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
     if (_beamTracing)
     {
+        // Point lying on the beam plane
+        FVector3f planePoint;
         // Intersection with this edge
         FVector3f intersection;
         // Edge extreme that falls inside projection
@@ -259,11 +261,22 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         TArray<IS_ReflectorEdge> blackList = TArray<IS_ReflectorEdge>();
         // Edge counter
         int e = 0;
-
+        // First normal refers to the parent surface plane and needs to use the surface origin as a plane point
+        bool firstNormal = true;
         
         // For all beam planes, check for intersections with the edges of this surface
         for (FVector3f normal : projectionPlanesNormals)
         {
+            if (firstNormal)
+            {
+                planePoint = parentSurface->Points()[0];
+                firstNormal = false;    
+            }
+            else
+            {
+                planePoint = parentPos;
+            }
+            
             blackList.Empty();
             e = 0;
 
@@ -281,7 +294,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
 
                 // Checks if the edge intersects the plane
-                if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentPos ) )
+                if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, planePoint ) )
                 {
                     // There's been at least one valid intersection
                     noIntersections = false;
@@ -294,7 +307,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     // Check if intersection is on the edge extremes
                     if ((intersection - edge.PointA).Length() <= 0.02f)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointB - parentPos).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) >= 0 )
                         {
                             // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
                             // The edge is included almost entirely, nothing to do here
@@ -309,7 +322,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     }
                     else if ((intersection - edge.PointB).Length() <= 0.02f)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointA - parentPos).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) >= 0 )
                         {
                             // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
                             // The edge is included almost entirely, nothing to do here
@@ -328,7 +341,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     if (!doNothing)
                     {
                         // The point that is on the correct semispace of the plane (to be kept)
-                        inPoint = FVector3f::DotProduct( normal, (edge.PointA - parentPos).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - parentPos).GetSafeNormal() ) ? edge.PointA : edge.PointB;
+                        inPoint = FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) ? edge.PointA : edge.PointB;
                         // The point that is on the other semispace of the plane (to be removed)
                         outPoint = inPoint == edge.PointA ? edge.PointB : edge.PointA;
 
@@ -342,7 +355,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             otherPoint = otherEdge.PointA == outPoint ? otherEdge.PointB : otherEdge.PointA;
 
                             // Checks if the other edge has also an intersection with the same projection plane
-                            if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, parentPos))
+                            if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
                             {
                                 // The second intersection is near the other point
                                 if ((secondIntersection - otherPoint).Length() <= 0.02f)
@@ -470,7 +483,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 for (FVector3f point : beam.Points())
                 {
                     // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                    if ( FVector3f::DotProduct( ((point + normal * 0.1f) - parentPos).GetSafeNormal() , normal) < -1e-6 )
+                    if ( FVector3f::DotProduct( ((point + normal * 0.1f) - planePoint).GetSafeNormal() , normal) < -1e-6 )
                     {
                         beamLock.Lock();
                         _beam++;
@@ -508,36 +521,6 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             areaLock.Unlock();
             
             return false;   
-        }
-    }
-
-
-
-    // 3.5
-    // Checking that the clipped IS surface isn't on the backside of the parent's surface
-    if ( _midBackSideSurfaces )
-    {
-        FVector3f intersectionPoint;
-        bool intersection = false;
-        
-        // Checking if the edges of the clipped IS surface are intersected by the plane of the parent's surface
-        for (IS_ReflectorEdge edge : beam.Edges())
-        {
-            if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, parentSurface->Normal(), parentSurface->Points()[0] ) )
-            {
-                intersection = true;
-                break;
-            }
-        }
-
-        // If the clipped IS surface is on the backside of the parent's surface
-        if ( !intersection && (beam.Points()[0] - parentSurface->Points()[0]).Dot(parentSurface->Normal()) < 0 )
-        {
-            midBackSideLock.Lock();
-            _midBackSide++;
-            midBackSideLock.Unlock();
-
-            return false;
         }
     }
 
@@ -639,9 +622,11 @@ void IS_Tree::CheckBackSideSurfaces()
 
 
 // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection)
+TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection, FVector3f surfaceNormal)
 {
     TArray<FVector3f> normals = TArray<FVector3f>();
+    normals.Add( surfaceNormal );
+    
     for (IS_ReflectorEdge e : BeamProjection.Edges())
     {
         FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position).GetSafeNormal();

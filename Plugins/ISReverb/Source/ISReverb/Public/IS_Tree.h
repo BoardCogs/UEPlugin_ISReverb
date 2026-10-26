@@ -89,7 +89,7 @@ private:
 	void CheckBackSideSurfaces();
 
     // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-    TArray<FVector3f> CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection);
+    TArray<FVector3f> CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection, FVector3f surfaceNormal);
 
     // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points
     bool CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points);
