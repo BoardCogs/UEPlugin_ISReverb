@@ -146,11 +146,11 @@ public:
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
-    bool PreGenerationBackSideSurfaces = true;
+    bool PreGenerationBacksideCulling = true;
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
-    bool MidGenerationBackSideSurfaces = false;
+    bool MidGenerationBacksideCulling = false;
 
     /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector (recommended) */
     UPROPERTY(EditAnywhere)

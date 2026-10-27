@@ -178,7 +178,7 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(TArray<AIS_Room*> listenerRooms, F
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerRooms, position, parallelExecution, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(Order, position, listenerRooms, parallelExecution, WrongSideOfReflector, PreGenerationBackSideSurfaces, MidGenerationBackSideSurfaces, BeamTracing, BeamClipping, CutArea);
+		IS_Tree tree = IS_Tree(Order, position, listenerRooms, parallelExecution, WrongSideOfReflector, PreGenerationBacksideCulling, MidGenerationBacksideCulling, BeamTracing, BeamClipping, CutArea);
 		Promise->SetValue(tree);
 	});
 
