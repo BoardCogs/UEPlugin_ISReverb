@@ -294,187 +294,182 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
 
                 // Checks if the edge intersects the plane
-                if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, planePoint ) )
-                {
-                    // There's been at least one valid intersection
-                    noIntersections = false;
-                    
-                    // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
-                    bool doNothing = false;
-                    // Wether the intersection is on the extreme of the edge and the edge is entirely out of the projection
-                    bool intersectionOnExtreme = false;
-
-                    // Check if intersection is on the edge extremes
-                    if ((intersection - edge.PointA).Length() <= 0.02f)
-                    {
-                        if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
-                        {
-                            // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
-                            // The edge is included almost entirely, nothing to do here
-                            doNothing = true;
-                        }
-                        else
-                        {
-                            // The intersection is near the edge extreme A and the projection plane excludes the other extreme, B
-                            // The edge is excluded almost entirely, this information is saved
-                            intersectionOnExtreme = true;
-                        }
-                    }
-                    else if ((intersection - edge.PointB).Length() <= 0.02f)
-                    {
-                        if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
-                        {
-                            // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
-                            // The edge is included almost entirely, nothing to do here
-                            doNothing = true;
-                        }
-                        else
-                        {
-                            // The intersection is near the edge extreme B and the projection plane excludes the other extreme, A
-                            // The edge is excluded almost entirely, this information is saved
-                            intersectionOnExtreme = true;
-                        }
-                    }
-
-
-                    // If the edge is not entirely inside the projection
-                    if (!doNothing)
-                    {
-                        // The point that is on the correct semispace of the plane (to be kept)
-                        inPoint = FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) ? edge.PointA : edge.PointB;
-                        // The point that is on the other semispace of the plane (to be removed)
-                        outPoint = inPoint == edge.PointA ? edge.PointB : edge.PointA;
-
-                        // Finds the other edge that the point to be removed belongs to
-                        otherEdge = beam.FindOtherEdge(outPoint, inPoint);
-
-                        // If the other edge has been found
-                        if (!otherEdge.IsVoid())
-                        {
-                            // The other point to which outPoint is connected
-                            otherPoint = otherEdge.PointA == outPoint ? otherEdge.PointB : otherEdge.PointA;
-
-                            // Checks if the other edge has also an intersection with the same projection plane
-                            if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
-                            {
-                                // The second intersection is near the other point
-                                if ((secondIntersection - otherPoint).Length() <= 0.02f)
-                                {
-                                    if (intersectionOnExtreme)
-                                    {
-                                        // Both this edge and the other are entirely out of the projection beam
-                                        // Both are removed and a single edge connecting their opposite extremes is created
-
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        blackList.Add( beam.AddEdge(inPoint, otherPoint) );
-                                    }
-                                    else
-                                    {
-                                        // The other edge is entirely out of the projection beam, the current one isn't
-                                        // Both are removed and two edges are created: inner point-intersection, intersection-other point
-
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        beam.AddPoint(intersection);
-
-                                        blackList.Add( beam.AddEdge(intersection, inPoint) );
-                                        blackList.Add( beam.AddEdge(intersection, otherPoint) );
-                                    }
-                                }
-                                // The second intersection is near the outpoint
-                                else if ((secondIntersection - outPoint).Length() <= 0.02f)
-                                {
-                                    blackList.Add(edge);
-                                    blackList.Add(otherEdge);
-                                }
-                                // The second intersection is not on the edge extremes
-                                else
-                                {
-                                    if (intersectionOnExtreme)
-                                    {
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        beam.AddPoint(secondIntersection);
-
-                                        blackList.Add( beam.AddEdge(inPoint, secondIntersection) );
-                                        blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
-                                    }
-                                    else
-                                    {
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        beam.AddPoint(intersection);
-                                        beam.AddPoint(secondIntersection);
-
-                                        blackList.Add( beam.AddEdge(intersection, inPoint) );
-                                        blackList.Add( beam.AddEdge(intersection, secondIntersection) );
-                                        blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
-                                    }
-                                }
-                            }
-                            // No second intersection on the other edge
-                            else
-                            {
-                                if (intersectionOnExtreme)
-                                {
-                                    beam.RemovePoint(outPoint);
-                                    
-                                    beam.RemoveEdge(edge);
-                                    beam.RemoveEdge(otherEdge);
-
-                                    beam.AddEdge(inPoint, otherPoint);
-                                }
-                                else
-                                {
-                                    beam.RemovePoint(outPoint);
-                                    
-                                    beam.RemoveEdge(edge);
-                                    beam.RemoveEdge(otherEdge);
-
-                                    beam.AddPoint(intersection);
-
-                                    beam.AddEdge(intersection, inPoint);
-                                    beam.AddEdge(intersection, otherPoint);
-                                }
-                            }
-
-                            e = 0;
-                        }
-                        else
-                        {
-                            // If the other edge has not been found, some approximation error has occurred
-                            // This means the projection is extremely small -> let's remove it altogether
-                            beamLock.Lock();
-                            _beam++;
-                            beamLock.Unlock();
-
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        blackList.Add(edge);
-                        e++;
-                    }
-                }
-                else
+                if (!LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, planePoint ) )
                 {
                     blackList.Add(edge);
                     e++;
+                    continue;
                 }
+                
+                // There's been at least one valid intersection
+                noIntersections = false;
+                
+                // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
+                bool doNothing = false;
+                // Wether the intersection is on the extreme of the edge and the edge is entirely out of the projection
+                bool intersectionOnExtreme = false;
+
+                // Check if intersection is on the edge extremes
+                if ((intersection - edge.PointA).Length() <= 0.02f)
+                {
+                    if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
+                    {
+                        // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
+                        // The edge is included almost entirely, nothing to do here
+                        doNothing = true;
+                    }
+                    else
+                    {
+                        // The intersection is near the edge extreme A and the projection plane excludes the other extreme, B
+                        // The edge is excluded almost entirely, this information is saved
+                        intersectionOnExtreme = true;
+                    }
+                }
+                else if ((intersection - edge.PointB).Length() <= 0.02f)
+                {
+                    if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
+                    {
+                        // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
+                        // The edge is included almost entirely, nothing to do here
+                        doNothing = true;
+                    }
+                    else
+                    {
+                        // The intersection is near the edge extreme B and the projection plane excludes the other extreme, A
+                        // The edge is excluded almost entirely, this information is saved
+                        intersectionOnExtreme = true;
+                    }
+                }
+                
+                // If the edge is not entirely inside the projection
+                if (doNothing)
+                {
+                    blackList.Add(edge);
+                    e++;
+                    continue;
+                }
+                    
+                // The point that is on the correct semispace of the plane (to be kept)
+                inPoint = FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) ? edge.PointA : edge.PointB;
+                // The point that is on the other semispace of the plane (to be removed)
+                outPoint = inPoint == edge.PointA ? edge.PointB : edge.PointA;
+
+                // Finds the other edge that the point to be removed belongs to
+                otherEdge = beam.FindOtherEdge(outPoint, inPoint);
+
+                // If the other edge has not been found
+                if (otherEdge.IsVoid())
+                {
+                    // If the other edge has not been found, some approximation error has occurred
+                    // This means the projection is extremely small -> let's remove it altogether
+                    beamLock.Lock();
+                    _beam++;
+                    beamLock.Unlock();
+
+                    return false;
+                }
+                
+                // The other point to which outPoint is connected
+                otherPoint = otherEdge.PointA == outPoint ? otherEdge.PointB : otherEdge.PointA;
+
+                // Checks if the other edge has also an intersection with the same projection plane
+                if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
+                {
+                    // The second intersection is near the other point
+                    if ((secondIntersection - otherPoint).Length() <= 0.02f)
+                    {
+                        if (intersectionOnExtreme)
+                        {
+                            // Both this edge and the other are entirely out of the projection beam
+                            // Both are removed and a single edge connecting their opposite extremes is created
+
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            blackList.Add( beam.AddEdge(inPoint, otherPoint) );
+                        }
+                        else
+                        {
+                            // The other edge is entirely out of the projection beam, the current one isn't
+                            // Both are removed and two edges are created: inner point-intersection, intersection-other point
+
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddPoint(intersection);
+
+                            blackList.Add( beam.AddEdge(intersection, inPoint) );
+                            blackList.Add( beam.AddEdge(intersection, otherPoint) );
+                        }
+                    }
+                    // The second intersection is near the outpoint
+                    else if ((secondIntersection - outPoint).Length() <= 0.02f)
+                    {
+                        blackList.Add(edge);
+                        blackList.Add(otherEdge);
+                    }
+                    // The second intersection is not on the edge extremes
+                    else
+                    {
+                        if (intersectionOnExtreme)
+                        {
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddPoint(secondIntersection);
+
+                            blackList.Add( beam.AddEdge(inPoint, secondIntersection) );
+                            blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
+                        }
+                        else
+                        {
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddPoint(intersection);
+                            beam.AddPoint(secondIntersection);
+
+                            blackList.Add( beam.AddEdge(intersection, inPoint) );
+                            blackList.Add( beam.AddEdge(intersection, secondIntersection) );
+                            blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
+                        }
+                    }
+                }
+                // No second intersection on the other edge
+                else
+                {
+                    if (intersectionOnExtreme)
+                    {
+                        beam.RemovePoint(outPoint);
+                        
+                        beam.RemoveEdge(edge);
+                        beam.RemoveEdge(otherEdge);
+
+                        beam.AddEdge(inPoint, otherPoint);
+                    }
+                    else
+                    {
+                        beam.RemovePoint(outPoint);
+                        
+                        beam.RemoveEdge(edge);
+                        beam.RemoveEdge(otherEdge);
+
+                        beam.AddPoint(intersection);
+
+                        beam.AddEdge(intersection, inPoint);
+                        beam.AddEdge(intersection, otherPoint);
+                    }
+                }
+
+                e = 0;
             }
 
             // If this beam plane has had no intersections with the entire clipped surface
