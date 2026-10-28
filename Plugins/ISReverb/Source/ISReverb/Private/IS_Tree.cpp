@@ -307,7 +307,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     // Check if intersection is on the edge extremes
                     if ((intersection - edge.PointA).Length() <= 0.02f)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
                         {
                             // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
                             // The edge is included almost entirely, nothing to do here
@@ -322,7 +322,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     }
                     else if ((intersection - edge.PointB).Length() <= 0.02f)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
                         {
                             // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
                             // The edge is included almost entirely, nothing to do here
@@ -483,7 +483,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 for (FVector3f point : beam.Points())
                 {
                     // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                    if ( FVector3f::DotProduct( ((point + normal * 0.1f) - planePoint).GetSafeNormal() , normal) < -1e-6 )
+                    if ( FVector3f::DotProduct( ((point + normal * 0.1f) - planePoint).GetSafeNormal() , normal) < 0 )
                     {
                         beamLock.Lock();
                         _beam++;
@@ -497,6 +497,34 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             {
                 // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
                 if (beam.Points().Num() <= 2 || beam.Edges().Num() <= 2)
+                {
+                    beamLock.Lock();
+                    _beam++;
+                    beamLock.Unlock();
+
+                    return false;
+                }
+            }
+        }
+
+        // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
+        for (FVector3f point : beam.Points())
+        {
+            firstNormal = true;
+            for (FVector3f normal : projectionPlanesNormals)
+            {
+                if (firstNormal)
+                {
+                    planePoint = parentSurface->Points()[0];
+                    firstNormal = false;    
+                }
+                else
+                {
+                    planePoint = parentPos;
+                }
+                
+                // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
+                if ( FVector3f::DotProduct( ((point + normal * 0.1f) - planePoint).GetSafeNormal() , normal) < 0 )
                 {
                     beamLock.Lock();
                     _beam++;
