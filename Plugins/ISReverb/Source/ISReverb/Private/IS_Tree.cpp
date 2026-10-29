@@ -78,7 +78,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 nodesLock.Unlock();
             
                 // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam, nodeSurface->Normal() );
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam, nodeSurface->Normal(), p );
 
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
@@ -101,7 +101,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 IS* node = &_nodes[p];
             
                 // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints, node->Surface->Normal() );
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints, node->Surface->Normal(), p );
 
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
@@ -304,45 +304,64 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 // There's been at least one valid intersection
                 noIntersections = false;
                 
-                // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
-                bool doNothing = false;
-                // Wether the intersection is on the extreme of the edge and the edge is entirely out of the projection
-                bool intersectionOnExtreme = false;
+                // Wether the intersection is on the extreme of the edge exluded from the half-plane and the edge is entirely in the projection
+                bool intersectionOnOutPoint = false;
+                // Wether the intersection is on the extreme of the edge included in the half-plane and the edge is entirely out of the projection
+                bool intersectionOnInPoint = false;
 
-                // Check if intersection is on the edge extremes
-                if ((intersection - edge.PointA).Length() <= 0.5f)
+                if ( (edge.PointA - edge.PointB).Length() > 0.2f * 2)
                 {
-                    if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
+                    // Check if intersection is on the edge extremes
+                    if ((intersection - edge.PointA).Length() <= 0.2f)
                     {
-                        // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
-                        // The edge is included almost entirely, nothing to do here
-                        doNothing = true;
+                        if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
+                        {
+                            // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
+                            // The edge is included almost entirely, nothing to do here
+                            intersectionOnOutPoint = true;
+                        }
+                        else
+                        {
+                            // The intersection is near the edge extreme A and the projection plane excludes the other extreme, B
+                            // The edge is excluded almost entirely, this information is saved
+                            intersectionOnInPoint = true;
+                        }
                     }
-                    else
+                    else if ((intersection - edge.PointB).Length() <= 0.2f)
                     {
-                        // The intersection is near the edge extreme A and the projection plane excludes the other extreme, B
-                        // The edge is excluded almost entirely, this information is saved
-                        intersectionOnExtreme = true;
+                        if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
+                        {
+                            // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
+                            // The edge is included almost entirely, nothing to do here
+                            intersectionOnOutPoint = true;
+                        }
+                        else
+                        {
+                            // The intersection is near the edge extreme B and the projection plane excludes the other extreme, A
+                            // The edge is excluded almost entirely, this information is saved
+                            intersectionOnInPoint = true;
+                        }
                     }
                 }
-                else if ((intersection - edge.PointB).Length() <= 0.5f)
+                else
                 {
-                    if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
-                    {
-                        // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
-                        // The edge is included almost entirely, nothing to do here
-                        doNothing = true;
-                    }
-                    else
-                    {
-                        // The intersection is near the edge extreme B and the projection plane excludes the other extreme, A
-                        // The edge is excluded almost entirely, this information is saved
-                        intersectionOnExtreme = true;
-                    }
+                    otherEdge = beam.FindOtherEdge(edge.PointA, edge.PointB);
+                    otherPoint = otherEdge.PointA == edge.PointA ? otherEdge.PointB : otherEdge.PointA;
+
+                    beam.RemovePoint(edge.PointA);
+
+                    beam.RemoveEdge(edge);
+                    beam.RemoveEdge(otherEdge);
+
+                    beam.AddEdge(edge.PointB, otherPoint);
+
+                    e = 0;
+
+                    continue;
                 }
                 
                 // If the edge is not entirely inside the projection
-                if (doNothing)
+                if (intersectionOnOutPoint)
                 {
                     blackList.Add(edge);
                     e++;
@@ -376,9 +395,9 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
                 {
                     // The second intersection is near the other point
-                    if ((secondIntersection - otherPoint).Length() <= 0.5f)
+                    if ((secondIntersection - otherPoint).Length() <= 0.2f)
                     {
-                        if (intersectionOnExtreme)
+                        if (intersectionOnInPoint)
                         {
                             // Both this edge and the other are entirely out of the projection beam
                             // Both are removed and a single edge connecting their opposite extremes is created
@@ -407,7 +426,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                         }
                     }
                     // The second intersection is near the outpoint
-                    else if ((secondIntersection - outPoint).Length() <= 0.5f)
+                    else if ((secondIntersection - outPoint).Length() <= 0.2f)
                     {
                         blackList.Add(edge);
                         blackList.Add(otherEdge);
@@ -415,7 +434,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                     // The second intersection is not on the edge extremes
                     else
                     {
-                        if (intersectionOnExtreme)
+                        if (intersectionOnInPoint)
                         {
                             beam.RemovePoint(outPoint);
 
@@ -442,11 +461,13 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
                         }
                     }
+
+                    break;
                 }
                 // No second intersection on the other edge
                 else
                 {
-                    if (intersectionOnExtreme)
+                    if (intersectionOnInPoint)
                     {
                         beam.RemovePoint(outPoint);
                         
@@ -478,7 +499,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 for (FVector3f point : beam.Points())
                 {
                     // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                    if ( FVector3f::DotProduct( ((point + normal * 1.0f) - planePoint).GetSafeNormal() , normal) < 0 )
+                    if ( FVector3f::DotProduct( ((point + normal * 0.5f) - planePoint).GetSafeNormal() , normal) < 0 )
                     {
                         beamLock.Lock();
                         _beam++;
@@ -519,7 +540,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
                 
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( ((point + normal * 1.0f) - planePoint).GetSafeNormal() , normal) < 0 )
+                if ( FVector3f::DotProduct( ((point + normal * 0.5f) - planePoint).GetSafeNormal() , normal) < 0 )
                 {
                     beamLock.Lock();
                     _beam++;
@@ -646,7 +667,7 @@ void IS_Tree::CheckBackSideSurfaces()
 
 
 // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection, FVector3f surfaceNormal)
+TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection, FVector3f surfaceNormal, int parent)
 {
     TArray<FVector3f> normals = TArray<FVector3f>();
     normals.Add( surfaceNormal );
@@ -655,7 +676,7 @@ TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamPro
     {
         FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position).GetSafeNormal();
 
-        normal = CheckNormal(normal, e.PointA, e.PointB, BeamProjection.Points()) ? normal : -normal;
+        normal = CheckNormal(normal, e.PointA, e.PointB, BeamProjection.Points(), parent) ? normal : -normal;
 
         normals.Add(normal);
     }
@@ -666,16 +687,45 @@ TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamPro
 
 
 // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points except those on the edge
-bool IS_Tree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points)
+bool IS_Tree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points, int parent)
 {
-    for(FVector3f point : points)
+    bool isNormal = true;
+    bool isNegativeNormal = true;
+    
+    for (FVector3f point : points)
     {
-        // Since the polygon forming the surface is convex, it's sufficient to check a single point that doesn't belong to the edge
         if (point != pointA && point != pointB)
-            return FVector3f::DotProduct((point - pointA).GetSafeNormal(), normal) >= 0;
+        {
+            // If a point of the polygon falls out of the edge's semispace
+            if ( FVector3f::DotProduct( (point - pointA).GetSafeNormal() , normal) < 0 )
+            {
+                isNormal = false;
+            }   
+        }
     }
 
-    return true;
+    for (FVector3f point : points)
+    {
+        if (point != pointA && point != pointB)
+        {
+            // If a point of the polygon falls out of the edge's other semispace
+            if ( FVector3f::DotProduct( (point - pointA).GetSafeNormal() , -normal) < 0 )
+            {
+                isNegativeNormal = false;
+            }   
+        }
+    }
+
+    if ( isNegativeNormal && isNormal )
+    {
+        UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on both half-planes of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+    }
+    else if ( !isNormal && !isNegativeNormal )
+    {
+        UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on neither half-plane of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+    }
+
+    return isNormal;
 }
 
 
@@ -694,20 +744,18 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
     {
         float length = dotNumerator / dotDenominator;
 
-        *intersection = linePoint + lineVec.GetSafeNormal() * length;
-
         if (length <= 0)
             *intersection = linePoint;
         else if (length >= lineVec.Length())
             *intersection = linePoint + lineVec;
+        else
+            *intersection = linePoint + lineVec.GetSafeNormal() * length;
 
-        return length >= -0.5f && length <= lineVec.Length() + 0.5f;
+        return length >= -0.2f && length <= lineVec.Length() + 0.2f;
     }
-    else
-    {
-        // The line and plane are parallel (no intersection)
-        return false;
-    }
+    
+    // The line and plane are parallel (no intersection)
+    return false;
 }
 
 
