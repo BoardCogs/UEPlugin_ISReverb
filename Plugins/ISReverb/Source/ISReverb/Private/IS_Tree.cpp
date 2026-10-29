@@ -310,7 +310,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 bool intersectionOnExtreme = false;
 
                 // Check if intersection is on the edge extremes
-                if ((intersection - edge.PointA).Length() <= 0.02f)
+                if ((intersection - edge.PointA).Length() <= 0.5f)
                 {
                     if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
                     {
@@ -325,7 +325,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                         intersectionOnExtreme = true;
                     }
                 }
-                else if ((intersection - edge.PointB).Length() <= 0.02f)
+                else if ((intersection - edge.PointB).Length() <= 0.5f)
                 {
                     if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
                     {
@@ -376,7 +376,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
                 {
                     // The second intersection is near the other point
-                    if ((secondIntersection - otherPoint).Length() <= 0.02f)
+                    if ((secondIntersection - otherPoint).Length() <= 0.5f)
                     {
                         if (intersectionOnExtreme)
                         {
@@ -407,7 +407,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                         }
                     }
                     // The second intersection is near the outpoint
-                    else if ((secondIntersection - outPoint).Length() <= 0.02f)
+                    else if ((secondIntersection - outPoint).Length() <= 0.5f)
                     {
                         blackList.Add(edge);
                         blackList.Add(otherEdge);
@@ -478,7 +478,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 for (FVector3f point : beam.Points())
                 {
                     // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                    if ( FVector3f::DotProduct( ((point + normal * 0.1f) - planePoint).GetSafeNormal() , normal) < 0 )
+                    if ( FVector3f::DotProduct( ((point + normal * 1.0f) - planePoint).GetSafeNormal() , normal) < 0 )
                     {
                         beamLock.Lock();
                         _beam++;
@@ -501,7 +501,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
             }
         }
-
+        /*
         // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
         for (FVector3f point : beam.Points())
         {
@@ -519,7 +519,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
                 
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( ((point + normal * 0.1f) - planePoint).GetSafeNormal() , normal) < 0 )
+                if ( FVector3f::DotProduct( ((point + normal * 1.0f) - planePoint).GetSafeNormal() , normal) < 0 )
                 {
                     beamLock.Lock();
                     _beam++;
@@ -529,6 +529,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
             }
         }
+        */
     }
 
 
@@ -700,7 +701,7 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
         else if (length >= lineVec.Length())
             *intersection = linePoint + lineVec;
 
-        return length >= -0.02f && length <= lineVec.Length() + 0.02f;
+        return length >= -0.5f && length <= lineVec.Length() + 0.5f;
     }
     else
     {

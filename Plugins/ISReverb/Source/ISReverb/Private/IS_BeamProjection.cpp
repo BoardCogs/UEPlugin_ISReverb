@@ -48,7 +48,7 @@ IS_ReflectorEdge IS_BeamProjection::AddEdge(FVector3f pointA, FVector3f pointB)
 
 	if (_edges.Contains(edge) || pointA == pointB)
 	{
-		return IS_ReflectorEdge::Void();
+		return edge;
 	}
 
 	_edges.Add( edge );
