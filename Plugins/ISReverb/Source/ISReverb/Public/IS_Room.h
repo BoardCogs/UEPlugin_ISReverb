@@ -1,9 +1,11 @@
 #pragma once
 
-#include "IS_ReflectorSurface.h"
+#include "Kismet/GameplayStatics.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "IS_Room.generated.h"
+
+class AIS_ReflectorSurface;
 
 
 
@@ -27,13 +29,14 @@ protected:
 	virtual void BeginPlay() override;
 
 public:
+	// Properties
 	UPROPERTY(EditAnywhere)
 	FString Name;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool VisibleSurfaces = false;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<AIS_ReflectorSurface*> Surfaces;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)

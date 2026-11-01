@@ -78,6 +78,9 @@ private:
 	// The list of surfaces such that at least one is on the backside of the other
 	TMap<AIS_ReflectorSurface*, TArray<AIS_ReflectorSurface*>> _backSideSurfacesList;
 
+	// Approximation applied when surface clipping
+	static inline float approximation = 2.0f;
+
 	// METHODS
     // All reflectors in the scene
     TArray<AIS_ReflectorSurface*> Surfaces();

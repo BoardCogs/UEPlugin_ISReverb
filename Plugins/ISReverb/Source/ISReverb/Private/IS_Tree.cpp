@@ -97,16 +97,18 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
             for (int index = 0 ; index < firstNodeOfOrder[order] - firstNodeOfOrder[order - 1] ; index++)
             {
                 int p = firstNodeOfOrder[order - 1] + index;
-                
-                IS* node = &_nodes[p];
+
+                FVector3f nodePos = _nodes[p].Position;
+                IS_BeamProjection nodeBeam = _nodes[p].BeamPoints;
+                AIS_ReflectorSurface* nodeSurface = _nodes[p].Surface;
             
                 // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints, node->Surface->Normal(), p );
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam, nodeSurface->Normal(), p );
 
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
                 {
-                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, node->Surface, node->Position, node->BeamPoints, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
                         i++;
                 }
             }
@@ -243,6 +245,25 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
     if (_beamTracing)
     {
+        /*
+        if (_nodes.Num() == 19390)
+        {
+            UE_LOG(LogTemp, Display, TEXT("New surface cutting here:"));
+
+            UE_LOG(LogTemp, Display, TEXT("Starting surface edges:"));
+            for (IS_ReflectorEdge edge : beam.Edges())
+            {
+                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+            }
+
+            UE_LOG(LogTemp, Display, TEXT("Starting surface points:"));
+            for (FVector3f point : beam.Points())
+            {
+                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+            }
+        }
+        */
+        
         // Point lying on the beam plane
         FVector3f planePoint;
         // Intersection with this edge
@@ -252,7 +273,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         // Edge extreme that falls outside projection
         FVector3f outPoint;
         // The other edge connected to the outPoint
-        IS_ReflectorEdge otherEdge = IS_ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
+        IS_ReflectorEdge otherEdge = IS_ReflectorEdge::Void();
         // Edge extreme of the other edge
         FVector3f otherPoint;
         // Intersection with the other edge
@@ -267,6 +288,13 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         // For all beam planes, check for intersections with the edges of this surface
         for (FVector3f normal : projectionPlanesNormals)
         {
+            /*
+            if (_nodes.Num() == 19390)
+            {
+                UE_LOG(LogTemp, Display, TEXT("Checking normal: (%f, %f, %f)"), normal.X, normal.Y, normal.Z);
+            }
+            */
+            
             if (firstNormal)
             {
                 planePoint = parentSurface->Points()[0];
@@ -309,10 +337,10 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 // Wether the intersection is on the extreme of the edge included in the half-plane and the edge is entirely out of the projection
                 bool intersectionOnInPoint = false;
 
-                if ( (edge.PointA - edge.PointB).Length() > 0.2f * 2)
+                if ( (edge.PointA - edge.PointB).Length() > approximation * 2)
                 {
                     // Check if intersection is on the edge extremes
-                    if ((intersection - edge.PointA).Length() <= 0.2f)
+                    if ((intersection - edge.PointA).Length() <= approximation)
                     {
                         if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
                         {
@@ -327,7 +355,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             intersectionOnInPoint = true;
                         }
                     }
-                    else if ((intersection - edge.PointB).Length() <= 0.2f)
+                    else if ((intersection - edge.PointB).Length() <= approximation)
                     {
                         if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
                         {
@@ -359,14 +387,6 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
                     continue;
                 }
-                
-                // If the edge is not entirely inside the projection
-                if (intersectionOnOutPoint)
-                {
-                    blackList.Add(edge);
-                    e++;
-                    continue;
-                }
                     
                 // The point that is on the correct semispace of the plane (to be kept)
                 inPoint = FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) ? edge.PointA : edge.PointB;
@@ -394,11 +414,38 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 // Checks if the other edge has also an intersection with the same projection plane
                 if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
                 {
-                    // The second intersection is near the other point
-                    if ((secondIntersection - otherPoint).Length() <= 0.2f)
+                    // 0
+                    // If the edge is entirely inside the projection
+                    if (intersectionOnOutPoint)
                     {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 0"));
+                        }
+                        */
+                        
+                        blackList.Add(edge);
+                        e++;
+                        continue;
+                    }
+                    
+                    // 1
+                    // The second intersection is near the other point
+                    if ((secondIntersection - otherPoint).Length() <= approximation)
+                    {
+                        // 1.1
                         if (intersectionOnInPoint)
                         {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 1.1"));
+                            }
+                            */
+                            
                             // Both this edge and the other are entirely out of the projection beam
                             // Both are removed and a single edge connecting their opposite extremes is created
 
@@ -407,10 +454,36 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             beam.RemoveEdge(edge);
                             beam.RemoveEdge(otherEdge);
 
-                            blackList.Add( beam.AddEdge(inPoint, otherPoint) );
+                            beam.AddEdge(inPoint, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 1.1:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 1.1:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
                         }
+                        // 1.2
                         else
                         {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 1.2"));
+                            }
+                            */
+                            
                             // The other edge is entirely out of the projection beam, the current one isn't
                             // Both are removed and two edges are created: inner point-intersection, intersection-other point
 
@@ -421,21 +494,58 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
                             beam.AddPoint(intersection);
 
-                            blackList.Add( beam.AddEdge(intersection, inPoint) );
-                            blackList.Add( beam.AddEdge(intersection, otherPoint) );
+                            beam.AddEdge(intersection, inPoint);
+                            beam.AddEdge(intersection, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 1.2:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 1.2:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
                         }
                     }
+                    // 2.1
                     // The second intersection is near the outpoint
-                    else if ((secondIntersection - outPoint).Length() <= 0.2f)
+                    else if ((secondIntersection - outPoint).Length() <= approximation)
                     {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 2.1"));
+                        }
+                        */
+
                         blackList.Add(edge);
-                        blackList.Add(otherEdge);
+                        e++;
+                        continue;
                     }
+                    // 3
                     // The second intersection is not on the edge extremes
                     else
                     {
+                        // 3.1
                         if (intersectionOnInPoint)
                         {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 3.1"));
+                            }
+                            */
+                            
                             beam.RemovePoint(outPoint);
 
                             beam.RemoveEdge(edge);
@@ -443,11 +553,37 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
                             beam.AddPoint(secondIntersection);
 
-                            blackList.Add( beam.AddEdge(inPoint, secondIntersection) );
-                            blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
+                            beam.AddEdge(inPoint, secondIntersection);
+                            beam.AddEdge(secondIntersection, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 3.1:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 3.1:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
                         }
+                        // 3.2
                         else
                         {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 3.2"));
+                            }
+                            */
+                            
                             beam.RemovePoint(outPoint);
 
                             beam.RemoveEdge(edge);
@@ -456,28 +592,118 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                             beam.AddPoint(intersection);
                             beam.AddPoint(secondIntersection);
 
-                            blackList.Add( beam.AddEdge(intersection, inPoint) );
-                            blackList.Add( beam.AddEdge(intersection, secondIntersection) );
-                            blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
+                            beam.AddEdge(intersection, inPoint);
+                            beam.AddEdge(intersection, secondIntersection);
+                            beam.AddEdge(secondIntersection, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 3.2:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 3.2:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
                         }
                     }
 
                     break;
                 }
+                // 4
                 // No second intersection on the other edge
                 else
                 {
+                    // 4.1
                     if (intersectionOnInPoint)
                     {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 4.1"));
+                        }
+                        */
+                        
                         beam.RemovePoint(outPoint);
                         
                         beam.RemoveEdge(edge);
                         beam.RemoveEdge(otherEdge);
 
                         beam.AddEdge(inPoint, otherPoint);
+
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Edges after 4.1:"));
+                            for (IS_ReflectorEdge edgy : beam.Edges())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                            }
+
+                            UE_LOG(LogTemp, Display, TEXT("Points after 4.1:"));
+                            for (FVector3f point : beam.Points())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                            }
+                        }
+                        */
                     }
+                    // 4.2
+                    else if (intersectionOnOutPoint)
+                    {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 4.2"));
+                        }
+                        */
+                        
+                        beam.RemovePoint(outPoint);
+                        
+                        beam.RemoveEdge(edge);
+                        beam.RemoveEdge(otherEdge);
+
+                        beam.AddPoint(intersection);
+                        blackList.Add( beam.AddEdge(intersection, inPoint) );
+                        beam.AddEdge(intersection, otherPoint);
+
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Edges after 4.2:"));
+                            for (IS_ReflectorEdge edgy : beam.Edges())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                            }
+
+                            UE_LOG(LogTemp, Display, TEXT("Points after 4.2:"));
+                            for (FVector3f point : beam.Points())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                            }
+                        }
+                        */
+                    }
+                    // 4.3
                     else
                     {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 4.3"));
+                        }
+                        */
+                        
                         beam.RemovePoint(outPoint);
                         
                         beam.RemoveEdge(edge);
@@ -487,6 +713,23 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
                         beam.AddEdge(intersection, inPoint);
                         beam.AddEdge(intersection, otherPoint);
+
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Edges after 4.3:"));
+                            for (IS_ReflectorEdge edgy : beam.Edges())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                            }
+
+                            UE_LOG(LogTemp, Display, TEXT("Points after 4.3:"));
+                            for (FVector3f point : beam.Points())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                            }
+                        }
+                        */
                     }
                 }
 
@@ -499,7 +742,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 for (FVector3f point : beam.Points())
                 {
                     // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                    if ( FVector3f::DotProduct( ((point + normal * 0.5f) - planePoint).GetSafeNormal() , normal) < 0 )
+                    if ( FVector3f::DotProduct( ((point + normal * (approximation + 0.1f)) - planePoint).GetSafeNormal() , normal) < 0 )
                     {
                         beamLock.Lock();
                         _beam++;
@@ -522,6 +765,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
             }
         }
+
         /*
         // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
         for (FVector3f point : beam.Points())
@@ -540,13 +784,16 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
                 
                 // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( ((point + normal * 0.5f) - planePoint).GetSafeNormal() , normal) < 0 )
+                if ( FVector3f::DotProduct( ((point + normal * (approximation + 0.2f)) - planePoint).GetSafeNormal() , normal) < 0 )
                 {
-                    beamLock.Lock();
-                    _beam++;
-                    beamLock.Unlock();
+                    UE_LOG(LogTemp, Display, TEXT("Node number %i would have been cut"), _nodes.Num());
+                    
+                    //beamLock.Lock();
+                    //_beam++;
+                    //beamLock.Unlock();
 
-                    return false;
+                    //return false;
+                    
                 }
             }
         }
@@ -716,13 +963,44 @@ bool IS_Tree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, 
         }
     }
 
+    /*
     if ( isNegativeNormal && isNormal )
     {
         UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on both half-planes of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
     }
-    else if ( !isNormal && !isNegativeNormal )
+    else*/ if ( !isNormal && !isNegativeNormal )
     {
-        UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on neither half-plane of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+        isNormal = true;
+        isNegativeNormal = true;
+    
+        for (FVector3f point : points)
+        {
+            // If a point of the polygon falls out of the edge's semispace
+            if ( FVector3f::DotProduct( ((point + normal * (approximation + 0.1f)) - pointA).GetSafeNormal() , normal) < 0 )
+            {
+                isNormal = false;
+            }
+        }
+
+        for (FVector3f point : points)
+        {
+            // If a point of the polygon falls out of the edge's other semispace
+            if ( FVector3f::DotProduct( ((point - normal * (approximation + 0.1f)) - pointA).GetSafeNormal() , -normal) < 0 )
+            {
+                isNegativeNormal = false;
+            }
+        }
+        
+        /*
+        if (isNormal == isNegativeNormal && isNormal)
+        {
+            UE_LOG(LogTemp, Display, TEXT("The polygon of %i is still on both half-planes of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on neither half-plane of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+        }
+        */
     }
 
     return isNormal;
@@ -744,14 +1022,37 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
     {
         float length = dotNumerator / dotDenominator;
 
-        if (length <= 0)
-            *intersection = linePoint;
-        else if (length >= lineVec.Length())
-            *intersection = linePoint + lineVec;
-        else
-            *intersection = linePoint + lineVec.GetSafeNormal() * length;
+        if ( length >= -approximation && length <= lineVec.Length() + approximation )
+        {
+            if (length <= 0)
+                *intersection = linePoint;
+            else if (length >= lineVec.Length())
+                *intersection = linePoint + lineVec;
+            else
+                *intersection = linePoint + lineVec.GetSafeNormal() * length;
 
-        return length >= -0.2f && length <= lineVec.Length() + 0.2f;
+            return true;
+        }
+        
+        bool closeToA = false;
+        bool closeToB = false;
+
+        if ( FMath::Abs(FVector3f::DotProduct(linePoint - planePoint, planeNormal)) <= approximation )
+        {
+            *intersection = linePoint;
+            closeToA = true;
+        }
+
+        if ( FMath::Abs(FVector3f::DotProduct((linePoint + lineVec) - planePoint, planeNormal)) <= approximation )
+        {
+            *intersection = linePoint + lineVec;
+            closeToB = true;
+        }
+        
+        if ( (closeToA && !closeToB) || (!closeToA && closeToB) )
+        {
+            return true;
+        }
     }
     
     // The line and plane are parallel (no intersection)

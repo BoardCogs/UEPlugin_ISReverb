@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IS_ReflectorEdge.h"
+#include "IS_Room.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "IS_ReflectorSurface.generated.h"
@@ -28,6 +29,9 @@ protected:
 
 public:
 	// PROPERTIES
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AIS_Room* Room;
+	
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
