@@ -1,4 +1,5 @@
 #include "IS_Room.h"
+#include "IS_ReflectorSurface.h"
 
 
 
@@ -19,11 +20,24 @@ void AIS_Room::BeginPlay()
 	
 	// Giving all reflectors a room-relative id 
 	int i = 0;
-	for (AIS_ReflectorSurface* s : Surfaces)
+
+	// Getting all listeners
+	TArray<AActor*> surfaces; 
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIS_ReflectorSurface::StaticClass(), surfaces);
+
+	Surfaces.Empty();
+	
+	for (AActor* s : surfaces)
 	{
-		//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Processing surface number %i"), i));
-		s->ID = i;
-		i++;
+		AIS_ReflectorSurface* surface = Cast<AIS_ReflectorSurface>(s);
+
+		if (surface->Room == this)
+		{
+			//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, FString::Printf(TEXT("Processing surface number %i"), i));
+			Surfaces.Add(surface);
+			surface->ID = i;
+			i++;	
+		}
 	}
 
 	// Saving the number of surfaces of the room

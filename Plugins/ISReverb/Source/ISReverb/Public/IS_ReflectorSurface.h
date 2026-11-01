@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IS_ReflectorEdge.h"
+#include "IS_Room.h"
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "IS_ReflectorSurface.generated.h"
@@ -28,11 +29,17 @@ protected:
 
 public:
 	// PROPERTIES
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AIS_Room* Room;
+	
 	UPROPERTY(VisibleAnywhere)
 	int ID;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool Visible = false;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    bool VisibleInRayTracing = true;
 
 	/* 125 Hz absorption coefficient */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Material properties", meta=(ClampMin = "0.0", ClampMax = "1.0", UIMin = "0.0", UIMax = "1.0"))

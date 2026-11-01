@@ -31,7 +31,7 @@ public:
 
 private:
     // Image Source tree
-    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, 0);
+    IS_Tree ISTree = IS_Tree(0, FVector3f::Zero(), TArray<AIS_Room*>(), false, false, false, false, false, false, 0);
 
     // First buffer containing all simulated sound rays
     // If currentBuffer1 = true, it's the front buffer
@@ -52,9 +52,6 @@ private:
     // Timer since BeginPlay was launched
     float startupTimer;
 
-    // Timer since last sound played
-    float timer;
-
     // Last source position for IS generation
     FVector3f LastSourcePos;
 
@@ -68,11 +65,11 @@ public:
 
     // Wether IS generation is cued to start as soon as the current operation finishes
     UPROPERTY(BlueprintReadWrite)
-    bool cueISGeneration = false;
+    bool CueISGeneration = false;
 
     // Wether RP generation is cued to start as soon as the current operation finishes
     UPROPERTY(BlueprintReadWrite)
-    bool cueRPGeneration = false;
+    bool CueRPGeneration = false;
 
     //[Header("System")]
     
@@ -88,9 +85,13 @@ public:
     UPROPERTY(EditAnywhere)
     UNiagaraSystem* SoundRayFX;
 
-    /* The MetaSounds system used to spawn audio (IS_EarlyReflections should go here) */
+    /* The MetaSounds system used to spawn the original sound and individual reflections (IS_EarlyReflectionsIndividual should go here) */
     UPROPERTY(EditAnywhere)
     UMetaSoundSource* SoundEmitter;
+
+    /* The MetaSounds system used to play multiple reflections together (IS_EarlyReflectionsTogether should go here) */
+    UPROPERTY(EditAnywhere)
+    UMetaSoundSource* ReflectionsEmitter;
 
     /* The audio attenuation settings (IS_SoundAttenuation should go here) */
     UPROPERTY(EditAnywhere)
@@ -104,23 +105,40 @@ public:
 
     /* Sound gain in dB for the played audio (also applies to reverb) */
     UPROPERTY(EditAnywhere)
-    float soundGain = 0;
+    float SoundGain = 0;
 
     //[Header("Complexity and accuracy")]
 
-    /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
-    UPROPERTY(EditAnywhere)
-    bool EnableMultithreading;
-
     /* The maximum order of reflection to be computed */
     UPROPERTY(EditAnywhere)
-    int order;
+    int Order;
 
     /* The distance after which ISs or ray paths are recomputed */
     UPROPERTY(EditAnywhere)
-    int recomputeDistance = 150;
+    int RecomputeDistance = 150;
+
+    /* Wheter the dry sound is played or not */
+    UPROPERTY(EditAnywhere)
+    bool DrySound = true;
+
+    /* The range of early reflections to be auralized individually */
+    UPROPERTY(EditAnywhere)
+    int IndividualReflections = 0;
+
+    /* The beginning (included) of the range of early reflections to auralize in clusters.
+     * If it overlaps with IndividualReflections, the first reflections are auralized individually. */
+    UPROPERTY(EditAnywhere)
+    int ClusteredReflectionsMin = 0;
+
+    /* The end (included) of the range of early reflections to auralize in clusters */
+    UPROPERTY(EditAnywhere)
+    int ClusteredReflectionsMax = 200;
 
     //[Header("Optimizations")]
+    
+    /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
+    UPROPERTY(EditAnywhere)
+    bool EnableMultithreading;
 
     /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
     UPROPERTY(EditAnywhere)
@@ -128,7 +146,11 @@ public:
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
-    bool BackSideSurfaces = true;
+    bool PreGenerationBacksideCulling = true;
+
+    /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
+    UPROPERTY(EditAnywhere)
+    bool MidGenerationBacksideCulling = false;
 
     /* Set true to remove ISs if their parent's projection on its reflector doesn't fall on their reflector (recommended) */
     UPROPERTY(EditAnywhere)
@@ -140,13 +162,13 @@ public:
 
     /* Beam projections with less area than this are discarded, set to <=0 to disable */
     UPROPERTY(EditAnywhere)
-    float CutArea = 1000;
+    float CutArea = 2500;
 
     //[Header("Visualization")]
 
     /* Maximum sound pressure level at 1 meter from source, in dB. Used only for graphical representation to show perception of sound */
     UPROPERTY(EditAnywhere)
-    float visualSoundLevel = 50;
+    float VisualSoundLevel = 50;
 
     /* The minimum order of valid reflections to be visualized (included), set to -1 to disable */
     UPROPERTY(EditAnywhere)
@@ -158,31 +180,39 @@ public:
 
     /* Set to true to visualize ISs */
     UPROPERTY(EditAnywhere)
-    bool drawSourcesAndListener = false;
+    bool DrawSourcesAndListener = false;
 
-    /* Set to true to visualize ISs */
+    /* Sets the size of ISs when drawn */
     UPROPERTY(EditAnywhere)
-    float ISSize = 10;
+    float ISSize = 7.5;
     
-    /* Set to true to visualize ISs */
+    /* Sets the size of source and listener when drawn */
     UPROPERTY(EditAnywhere)
     float SourceAndListenerSize = 50;
 
     //[Header("Debug")]
 
-    /* Draws projection of beam points and beam edges upon the reflector plane */
-    UPROPERTY(EditAnywhere)
-    bool drawPlaneProjection = true;
-
     /* The id of the IS node to be visualized for debug, set to -1 to disable */
     UPROPERTY(EditAnywhere)
-    int checkNode = -1;
+    int CheckNode = -1;
+
+    /* Draws projection of beam points and beam edges upon the reflector plane */
+    UPROPERTY(EditAnywhere)
+    bool DrawPlaneProjection = true;
+
+    /* Draws the ray generated from this IS.
+     * Drawn in black if the visibility tests succeeded,
+     * otherwise the partial ray will be drawn in red up until the segment that failed the visibility test.*/
+    UPROPERTY(EditAnywhere)
+    bool DrawRay = true;
+
+    /* Sets the size of lines used to draw the surfaces, beam and ray */
+    UPROPERTY(EditAnywhere)
+    float LineSize = 4;
 
     /* The id of this IS node's parent */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    int parentNode = 0;
-
-    FCriticalSection treesLock;
+    int ParentNode = 0;
 
 
 
@@ -191,9 +221,6 @@ protected:
     virtual void BeginPlay() override;
 
     virtual void Tick(float DeltaSeconds) override;
-
-    // Called upon changes made in the editor.
-    //virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
 
     
@@ -206,7 +233,7 @@ private:
 
     void GenerateISsMT(FVector3f listenerPos, TArray<AIS_Room*> listenerRooms, FVector3f position);
 
-    TFuture<IS_Tree> CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position);
+    TFuture<IS_Tree> CreateISTreeTask(TArray<AIS_Room*> listenerRooms, FVector3f position, bool parallelExecution);
 
     void GenerateRP(FVector3f listenerPos);
 

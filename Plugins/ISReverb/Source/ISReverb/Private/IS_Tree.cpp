@@ -2,7 +2,7 @@
 
 
 
-IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrongSideOfReflector, bool backSideSurfaces, bool beamTracing, bool beamClipping, float cutArea)
+IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool parallelExecution, bool wrongSideOfReflector, bool preGenBackSideSurfaces, bool midGenBackSideSurfaces, bool beamTracing, bool beamClipping, float cutArea)
 {
     if (r == 0)
         return;
@@ -12,7 +12,8 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     _surfaces = Surfaces();
     _sn = _surfaces.Num();
     _wrongSideOfReflector = wrongSideOfReflector;
-    _backSideSurfaces = backSideSurfaces;
+    _preBackSideSurfaces = preGenBackSideSurfaces;
+    _midBackSideSurfaces = midGenBackSideSurfaces;
     _beamTracing = beamTracing;
     _beamClipping = beamClipping;
     _cutArea = cutArea;
@@ -20,7 +21,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     FDateTime StartTime = FDateTime::UtcNow();
 
     // Checking for surfaces that face completely away from each other
-    if (_backSideSurfaces)
+    if (_preBackSideSurfaces)
     {
         _backSideSurfacesList.Empty();
         CheckBackSideSurfaces();
@@ -29,52 +30,89 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
     TArray<int> firstNodeOfOrder = TArray{ 0, 0 };
 
     // Creating the first order ISs
-    for (int i = 0; i < _sn ; i++, _realISs++)
+    for (int i = 0; i < _sn ; i++)
     {
-        FVector3f pos = sourcePos;
-        pos -= 2 * FVector3f::DotProduct(_surfaces[i]->Normal(),pos - _surfaces[i]->Origin()) * _surfaces[i]->Normal();
+        // Computing the position of the new IS by mirroring its parent along the reflecting surface
+        float d = FVector3f::DotProduct(_surfaces[i]->Normal(),sourcePos - _surfaces[i]->Origin());
+        
+        // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
+        if ( _wrongSideOfReflector && d <= 0 )
+        {
+            _wrongSide++;
+            continue;
+        }
+
+        FVector3f pos = sourcePos - 2 * d * _surfaces[i]->Normal();
 
         _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], IS_BeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
+        _realISs++;
     }
 
     FCriticalSection iLock;
     FCriticalSection nodesLock;
     FCriticalSection noDoubleLock;
     FCriticalSection wrongSideLock;
-    FCriticalSection backSideLock;
+    FCriticalSection preBackSideLock;
+    FCriticalSection midBackSideLock;
     FCriticalSection beamLock;
     FCriticalSection areaLock;
     FCriticalSection realISsLock;
     
     // Creating all ISs from second order onward
-    for (int i = _sn, order = 2 ; order <= _ro ; order++)
+    for (int i = _nodes.Num(), order = 2 ; order <= _ro ; order++)
     {
         // Sets the first IS of the currently considered order of reflection
         firstNodeOfOrder.Add(i);
-        
-        ParallelFor(firstNodeOfOrder[order] - firstNodeOfOrder[order - 1],
-        [&](int32 index)
-        {
-            int p = firstNodeOfOrder[order - 1] + index;
-            
-            nodesLock.Lock();
-            IS* node = &_nodes[p];
-            nodesLock.Unlock();
-            
-            // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
-            TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( node->Position, node->BeamPoints );
 
-            // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
-            for (int s = 0 ; s < _sn ; s++)
+        if (parallelExecution)
+        {
+            ParallelFor(firstNodeOfOrder[order] - firstNodeOfOrder[order - 1],
+            [&](int32 index)
             {
-                if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodesLock, noDoubleLock, wrongSideLock, backSideLock, beamLock, areaLock, realISsLock) )
+                int p = firstNodeOfOrder[order - 1] + index;
+            
+                nodesLock.Lock();
+                FVector3f nodePos = _nodes[p].Position;
+                IS_BeamProjection nodeBeam = _nodes[p].BeamPoints;
+                AIS_ReflectorSurface* nodeSurface = _nodes[p].Surface;
+                nodesLock.Unlock();
+            
+                // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam, nodeSurface->Normal(), p );
+
+                // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
+                for (int s = 0 ; s < _sn ; s++)
                 {
-                    iLock.Lock();
-                    i++;
-                    iLock.Unlock();
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
+                    {
+                        iLock.Lock();
+                        i++;
+                        iLock.Unlock();
+                    }
+                }
+            });
+        }
+        else
+        {
+            for (int index = 0 ; index < firstNodeOfOrder[order] - firstNodeOfOrder[order - 1] ; index++)
+            {
+                int p = firstNodeOfOrder[order - 1] + index;
+
+                FVector3f nodePos = _nodes[p].Position;
+                IS_BeamProjection nodeBeam = _nodes[p].BeamPoints;
+                AIS_ReflectorSurface* nodeSurface = _nodes[p].Surface;
+            
+                // Beam projection planes for the parent are generated here, to avoid repeating the operation for each child
+                TArray<FVector3f> projectionPlanesNormals = CreateProjectionPlanes( nodePos, nodeBeam, nodeSurface->Normal(), p );
+
+                // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
+                for (int s = 0 ; s < _sn ; s++)
+                {
+                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
+                        i++;
                 }
             }
-        });
+        }
     }
 
     int TimeElapsedInMs = (FDateTime::UtcNow() - StartTime).GetTotalMilliseconds();
@@ -88,22 +126,18 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool wrong
                                   "Optimizations:\n"
                                   " - No reflection on same surface twice in a row: %i ISs removed\n"
                                   " - Wrong side of reflector: %i ISs removed\n"
-                                  " - Backside surfaces: %i ISs removed\n"
+                                  " - Pre-generation backside surfaces: %i ISs removed\n"
+                                  " - Mid-generation backside surfaces: %i ISs removed\n"
                                   " - Beam tracing%hs: %i ISs removed\n"
                                   " - Cut area: %i ISs removed"),
-                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, _backSide, (_beamClipping ? " + clipping" : ""), _beam, _area);
+                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, _preBackSide, _midBackSide, (_beamClipping ? " + clipping" : ""), _beam, _area);
 }
 
 
 
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
-bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& backSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock)
+bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, AIS_ReflectorSurface* parentSurface, FVector3f parentPos, IS_BeamProjection parentBeam, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& preBackSideLock, FCriticalSection& midBackSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock)
 {
-    nodesLock.Lock();
-    FVector3f parentPos = _nodes[parent].Position;
-    AIS_ReflectorSurface* parentSurface = _nodes[parent].Surface;
-    nodesLock.Unlock();
-    
 	// 1
     // Checking that no IS is created identifying a reflection on the same surface twice in a row
     // This is because a double reflection is impossible assuming flat surfaces
@@ -118,14 +152,14 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
 
     
-    // Computing the position of the new IS by mirroring its parent along the reflecting surface
-    FVector3f pos = parentPos;
-    float d = FVector3f::DotProduct( surface->Normal() , pos - surface->Origin() );
+    // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
 
-
+    
 
     // 2
-    // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
+    // Computing the position of the new IS by mirroring its parent along the reflecting surface 
+    float d = FVector3f::DotProduct( surface->Normal() , parentPos - surface->Origin() );
+    
     if ( _wrongSideOfReflector && d <= 0 )
     {
         wrongSideLock.Lock();
@@ -138,24 +172,23 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
 
     // Computing the position of the new IS by mirroring its parent along the reflecting surface
-    pos -= 2 * d * surface->Normal();
+    FVector3f pos = parentPos - 2 * d * surface->Normal();
 
 
 
-    // 3
-    // Checking that the two surfaces are not one on the backside of the other
-    if ( _backSideSurfaces )
+    // 3.0
+    // Checking that the two surfaces (in their entirety) are not one on the backside of the other
+    if ( _preBackSideSurfaces )
     {
-        backSideLock.Lock();
-
         // Checking if the two surfaces are listed together
         // Either the parent surface is in the list of this IS's surface
         if (_backSideSurfacesList.Contains(surface))
         {
             if (_backSideSurfacesList[surface].Contains(parentSurface))
             {
-                _backSide++;
-                backSideLock.Unlock();
+                preBackSideLock.Lock();
+                _preBackSide++;
+                preBackSideLock.Unlock();
                 return false;
             }
         }
@@ -165,13 +198,42 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         {
             if (_backSideSurfacesList[parentSurface].Contains(surface))
             {
-                _backSide++;
-                backSideLock.Unlock();
+                preBackSideLock.Lock();
+                _preBackSide++;
+                preBackSideLock.Unlock();
                 return false;
             }
         }
+    }
+
+
+
+    // 3.5
+    // Checking that the clipped parent surface isn't on the backside of the IS's surface
+    if ( _midBackSideSurfaces )
+    {
+        FVector3f intersectionPoint;
+        bool intersection = false;
         
-        backSideLock.Unlock();
+        // Checking if the edges of the parent's clipped surface are intersected by the plane of this IS's surface
+        for (IS_ReflectorEdge edge : parentBeam.Edges())
+        {
+            if (LinePlaneIntersection( &intersectionPoint, edge.PointA, edge.PointB - edge.PointA, surface->Normal(), surface->Points()[0] ) )
+            {
+                intersection = true;
+                break;
+            }
+        }
+
+        // If the parent's clipped surface is on the backside of the IS surface
+        if ( !intersection && (parentBeam.Points()[0] - surface->Points()[0]).Dot(surface->Normal()) < 0 )
+        {
+            midBackSideLock.Lock();
+            _midBackSide++;
+            midBackSideLock.Unlock();
+
+            return false;
+        }
     }
 
 
@@ -183,6 +245,27 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
     if (_beamTracing)
     {
+        /*
+        if (_nodes.Num() == 19390)
+        {
+            UE_LOG(LogTemp, Display, TEXT("New surface cutting here:"));
+
+            UE_LOG(LogTemp, Display, TEXT("Starting surface edges:"));
+            for (IS_ReflectorEdge edge : beam.Edges())
+            {
+                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+            }
+
+            UE_LOG(LogTemp, Display, TEXT("Starting surface points:"));
+            for (FVector3f point : beam.Points())
+            {
+                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+            }
+        }
+        */
+        
+        // Point lying on the beam plane
+        FVector3f planePoint;
         // Intersection with this edge
         FVector3f intersection;
         // Edge extreme that falls inside projection
@@ -190,21 +273,43 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
         // Edge extreme that falls outside projection
         FVector3f outPoint;
         // The other edge connected to the outPoint
-        IS_ReflectorEdge otherEdge = IS_ReflectorEdge(FVector3f::Zero(), FVector3f::Zero());
+        IS_ReflectorEdge otherEdge = IS_ReflectorEdge::Void();
         // Edge extreme of the other edge
         FVector3f otherPoint;
         // Intersection with the other edge
         FVector3f secondIntersection;
         // List of edges that don't need an intersection to be tested (to avoid repeated intersection detection on edge extremes)
         TArray<IS_ReflectorEdge> blackList = TArray<IS_ReflectorEdge>();
+        // Edge counter
         int e = 0;
-
+        // First normal refers to the parent surface plane and needs to use the surface origin as a plane point
+        bool firstNormal = true;
         
-        // For all planes of projection, check for intersections with the edges of this surface
+        // For all beam planes, check for intersections with the edges of this surface
         for (FVector3f normal : projectionPlanesNormals)
         {
+            /*
+            if (_nodes.Num() == 19390)
+            {
+                UE_LOG(LogTemp, Display, TEXT("Checking normal: (%f, %f, %f)"), normal.X, normal.Y, normal.Z);
+            }
+            */
+            
+            if (firstNormal)
+            {
+                planePoint = parentSurface->Points()[0];
+                firstNormal = false;    
+            }
+            else
+            {
+                planePoint = parentPos;
+            }
+            
             blackList.Empty();
             e = 0;
+
+            // If true, the beam plane has no intersections with all edges of the (clipped) surface
+            bool noIntersections = true;
 
             while (e < beam.Edges().Num())
             {
@@ -217,209 +322,440 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
 
                 // Checks if the edge intersects the plane
-                if (LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, parentPos ) )
+                if (!LinePlaneIntersection( &intersection, edge.PointA, edge.PointB - edge.PointA, normal, planePoint ) )
                 {
-                    // Wether the intersection is on the extreme of the edge and the edge is entirely in the projection
-                    bool doNothing = false;
-                    // Wether the intersection is on the extreme of the edge and the edge is entirely out of the projection
-                    bool intersectionOnExtreme = false;
+                    blackList.Add(edge);
+                    e++;
+                    continue;
+                }
+                
+                // There's been at least one valid intersection
+                noIntersections = false;
+                
+                // Wether the intersection is on the extreme of the edge exluded from the half-plane and the edge is entirely in the projection
+                bool intersectionOnOutPoint = false;
+                // Wether the intersection is on the extreme of the edge included in the half-plane and the edge is entirely out of the projection
+                bool intersectionOnInPoint = false;
 
+                if ( (edge.PointA - edge.PointB).Length() > approximation * 2)
+                {
                     // Check if intersection is on the edge extremes
-                    if ((intersection - edge.PointA).Length() <= 0.02f)
+                    if ((intersection - edge.PointA).Length() <= approximation)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointB - parentPos).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) > 0 )
                         {
                             // The intersection is near the edge extreme A and the projection plane includes the other extreme, B
                             // The edge is included almost entirely, nothing to do here
-                            doNothing = true;
+                            intersectionOnOutPoint = true;
                         }
                         else
                         {
                             // The intersection is near the edge extreme A and the projection plane excludes the other extreme, B
                             // The edge is excluded almost entirely, this information is saved
-                            intersectionOnExtreme = true;
+                            intersectionOnInPoint = true;
                         }
                     }
-                    else if ((intersection - edge.PointB).Length() <= 0.02f)
+                    else if ((intersection - edge.PointB).Length() <= approximation)
                     {
-                        if ( FVector3f::DotProduct( normal, (edge.PointA - parentPos).GetSafeNormal() ) >= 0 )
+                        if ( FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > 0 )
                         {
                             // The intersection is near the edge extreme B and the projection plane includes the other extreme, A
                             // The edge is included almost entirely, nothing to do here
-                            doNothing = true;
+                            intersectionOnOutPoint = true;
                         }
                         else
                         {
                             // The intersection is near the edge extreme B and the projection plane excludes the other extreme, A
                             // The edge is excluded almost entirely, this information is saved
-                            intersectionOnExtreme = true;
+                            intersectionOnInPoint = true;
                         }
-                    }
-
-
-                    // If the edge is not entirely inside the projection
-                    if (!doNothing)
-                    {
-                        // The point that is on the correct semispace of the plane (to be kept)
-                        inPoint = FVector3f::DotProduct( normal, (edge.PointA - parentPos).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - parentPos).GetSafeNormal() ) ? edge.PointA : edge.PointB;
-                        // The point that is on the other semispace of the plane (to be removed)
-                        outPoint = inPoint == edge.PointA ? edge.PointB : edge.PointA;
-
-                        // Finds the other edge that the point to be removed belongs to
-                        otherEdge = beam.FindOtherEdge(outPoint, inPoint);
-
-                        // If the other edge has been found
-                        if (!otherEdge.IsVoid())
-                        {
-                            // The other point to which outPoint is connected
-                            otherPoint = otherEdge.PointA == outPoint ? otherEdge.PointB : otherEdge.PointA;
-
-                            // Checks if the other edge has also an intersection with the same projection plane
-                            if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, parentPos))
-                            {
-                                // The second intersection is near the other point
-                                if ((secondIntersection - otherPoint).Length() <= 0.02f)
-                                {
-                                    if (intersectionOnExtreme)
-                                    {
-                                        // Both this edge and the other are entirely out of the projection beam
-                                        // Both are removed and a single edge connecting theit opposite extremes is created
-
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        blackList.Add( beam.AddEdge(inPoint, otherPoint) );
-                                    }
-                                    else
-                                    {
-                                        // The other edge is entirely out of the projection beam, the current one isn't
-                                        // Both are removed and two edges are created: inner point-intersection, intersection-other point
-
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        beam.AddPoint(intersection);
-
-                                        blackList.Add( beam.AddEdge(intersection, inPoint) );
-                                        blackList.Add( beam.AddEdge(intersection, otherPoint) );
-                                    }
-                                }
-                                // The second intersection is near the outpoint
-                                else if ((intersection - outPoint).Length() <= 0.02f)
-                                {
-                                    blackList.Add(edge);
-                                }
-                                // The second intersection is not on the edge extremes
-                                else
-                                {
-                                    if (intersectionOnExtreme)
-                                    {
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        beam.AddPoint(secondIntersection);
-
-                                        blackList.Add( beam.AddEdge(inPoint, secondIntersection) );
-                                        blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
-                                    }
-                                    else
-                                    {
-                                        beam.RemovePoint(outPoint);
-
-                                        beam.RemoveEdge(edge);
-                                        beam.RemoveEdge(otherEdge);
-
-                                        beam.AddPoint(intersection);
-                                        beam.AddPoint(secondIntersection);
-
-                                        blackList.Add( beam.AddEdge(intersection, inPoint) );
-                                        blackList.Add( beam.AddEdge(intersection, secondIntersection) );
-                                        blackList.Add( beam.AddEdge(secondIntersection, otherPoint) );
-                                    }
-                                }
-                            }
-                            // No second intersection on the other edge
-                            else
-                            {
-                                if (intersectionOnExtreme)
-                                {
-                                    beam.RemovePoint(outPoint);
-                                    
-                                    beam.RemoveEdge(edge);
-                                    beam.RemoveEdge(otherEdge);
-
-                                    beam.AddEdge(inPoint, otherPoint);
-                                }
-                                else
-                                {
-                                    beam.RemovePoint(outPoint);
-                                    
-                                    beam.RemoveEdge(edge);
-                                    beam.RemoveEdge(otherEdge);
-
-                                    beam.AddPoint(intersection);
-
-                                    beam.AddEdge(intersection, inPoint);
-                                    beam.AddEdge(intersection, otherPoint);
-                                }
-                            }
-
-                            e = 0;
-
-                        }
-                        else
-                        {
-                            /*
-                            blackList.Add(edge);
-                            e++;
-                            */
-
-                            // If the other edge has not been found, some approximation error has occurred
-                            // This means the projection is extremely small -> let's remove it altogether
-                            beamLock.Lock();
-                            _beam++;
-                            beamLock.Unlock();
-
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        blackList.Add(edge);
-                        e++;
                     }
                 }
                 else
                 {
-                    blackList.Add(edge);
-                    e++;
+                    otherEdge = beam.FindOtherEdge(edge.PointA, edge.PointB);
+                    otherPoint = otherEdge.PointA == edge.PointA ? otherEdge.PointB : otherEdge.PointA;
+
+                    beam.RemovePoint(edge.PointA);
+
+                    beam.RemoveEdge(edge);
+                    beam.RemoveEdge(otherEdge);
+
+                    beam.AddEdge(edge.PointB, otherPoint);
+
+                    e = 0;
+
+                    continue;
+                }
+                    
+                // The point that is on the correct semispace of the plane (to be kept)
+                inPoint = FVector3f::DotProduct( normal, (edge.PointA - planePoint).GetSafeNormal() ) > FVector3f::DotProduct( normal, (edge.PointB - planePoint).GetSafeNormal() ) ? edge.PointA : edge.PointB;
+                // The point that is on the other semispace of the plane (to be removed)
+                outPoint = inPoint == edge.PointA ? edge.PointB : edge.PointA;
+
+                // Finds the other edge that the point to be removed belongs to
+                otherEdge = beam.FindOtherEdge(outPoint, inPoint);
+
+                // If the other edge has not been found
+                if (otherEdge.IsVoid())
+                {
+                    // If the other edge has not been found, some approximation error has occurred
+                    // This means the projection is extremely small -> let's remove it altogether
+                    beamLock.Lock();
+                    _beam++;
+                    beamLock.Unlock();
+
+                    return false;
+                }
+                
+                // The other point to which outPoint is connected
+                otherPoint = otherEdge.PointA == outPoint ? otherEdge.PointB : otherEdge.PointA;
+
+                // Checks if the other edge has also an intersection with the same projection plane
+                if (LinePlaneIntersection( &secondIntersection, otherEdge.PointA, otherEdge.PointB - otherEdge.PointA, normal, planePoint))
+                {
+                    // 0
+                    // If the edge is entirely inside the projection
+                    if (intersectionOnOutPoint)
+                    {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 0"));
+                        }
+                        */
+                        
+                        blackList.Add(edge);
+                        e++;
+                        continue;
+                    }
+                    
+                    // 1
+                    // The second intersection is near the other point
+                    if ((secondIntersection - otherPoint).Length() <= approximation)
+                    {
+                        // 1.1
+                        if (intersectionOnInPoint)
+                        {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 1.1"));
+                            }
+                            */
+                            
+                            // Both this edge and the other are entirely out of the projection beam
+                            // Both are removed and a single edge connecting their opposite extremes is created
+
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddEdge(inPoint, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 1.1:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 1.1:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
+                        }
+                        // 1.2
+                        else
+                        {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 1.2"));
+                            }
+                            */
+                            
+                            // The other edge is entirely out of the projection beam, the current one isn't
+                            // Both are removed and two edges are created: inner point-intersection, intersection-other point
+
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddPoint(intersection);
+
+                            beam.AddEdge(intersection, inPoint);
+                            beam.AddEdge(intersection, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 1.2:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 1.2:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
+                        }
+                    }
+                    // 2.1
+                    // The second intersection is near the outpoint
+                    else if ((secondIntersection - outPoint).Length() <= approximation)
+                    {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 2.1"));
+                        }
+                        */
+
+                        blackList.Add(edge);
+                        e++;
+                        continue;
+                    }
+                    // 3
+                    // The second intersection is not on the edge extremes
+                    else
+                    {
+                        // 3.1
+                        if (intersectionOnInPoint)
+                        {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 3.1"));
+                            }
+                            */
+                            
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddPoint(secondIntersection);
+
+                            beam.AddEdge(inPoint, secondIntersection);
+                            beam.AddEdge(secondIntersection, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 3.1:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 3.1:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
+                        }
+                        // 3.2
+                        else
+                        {
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                                UE_LOG(LogTemp, Display, TEXT("Case 3.2"));
+                            }
+                            */
+                            
+                            beam.RemovePoint(outPoint);
+
+                            beam.RemoveEdge(edge);
+                            beam.RemoveEdge(otherEdge);
+
+                            beam.AddPoint(intersection);
+                            beam.AddPoint(secondIntersection);
+
+                            beam.AddEdge(intersection, inPoint);
+                            beam.AddEdge(intersection, secondIntersection);
+                            beam.AddEdge(secondIntersection, otherPoint);
+
+                            /*
+                            if (_nodes.Num() == 19390)
+                            {
+                                UE_LOG(LogTemp, Display, TEXT("Edges after 3.2:"));
+                                for (IS_ReflectorEdge edgy : beam.Edges())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                                }
+
+                                UE_LOG(LogTemp, Display, TEXT("Points after 3.2:"));
+                                for (FVector3f point : beam.Points())
+                                {
+                                    UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                                }
+                            }
+                            */
+                        }
+                    }
+
+                    break;
+                }
+                // 4
+                // No second intersection on the other edge
+                else
+                {
+                    // 4.1
+                    if (intersectionOnInPoint)
+                    {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 4.1"));
+                        }
+                        */
+                        
+                        beam.RemovePoint(outPoint);
+                        
+                        beam.RemoveEdge(edge);
+                        beam.RemoveEdge(otherEdge);
+
+                        beam.AddEdge(inPoint, otherPoint);
+
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Edges after 4.1:"));
+                            for (IS_ReflectorEdge edgy : beam.Edges())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                            }
+
+                            UE_LOG(LogTemp, Display, TEXT("Points after 4.1:"));
+                            for (FVector3f point : beam.Points())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                            }
+                        }
+                        */
+                    }
+                    // 4.2
+                    else if (intersectionOnOutPoint)
+                    {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 4.2"));
+                        }
+                        */
+                        
+                        beam.RemovePoint(outPoint);
+                        
+                        beam.RemoveEdge(edge);
+                        beam.RemoveEdge(otherEdge);
+
+                        beam.AddPoint(intersection);
+                        blackList.Add( beam.AddEdge(intersection, inPoint) );
+                        beam.AddEdge(intersection, otherPoint);
+
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Edges after 4.2:"));
+                            for (IS_ReflectorEdge edgy : beam.Edges())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                            }
+
+                            UE_LOG(LogTemp, Display, TEXT("Points after 4.2:"));
+                            for (FVector3f point : beam.Points())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                            }
+                        }
+                        */
+                    }
+                    // 4.3
+                    else
+                    {
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Checking edge: (%f, %f, %f), (%f, %f, %f)"), edge.PointA.X, edge.PointA.Y, edge.PointA.Z, edge.PointB.X, edge.PointB.Y, edge.PointB.Z);
+                            UE_LOG(LogTemp, Display, TEXT("Case 4.3"));
+                        }
+                        */
+                        
+                        beam.RemovePoint(outPoint);
+                        
+                        beam.RemoveEdge(edge);
+                        beam.RemoveEdge(otherEdge);
+
+                        beam.AddPoint(intersection);
+
+                        beam.AddEdge(intersection, inPoint);
+                        beam.AddEdge(intersection, otherPoint);
+
+                        /*
+                        if (_nodes.Num() == 19390)
+                        {
+                            UE_LOG(LogTemp, Display, TEXT("Edges after 4.3:"));
+                            for (IS_ReflectorEdge edgy : beam.Edges())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f), (%f, %f, %f)"), edgy.PointA.X, edgy.PointA.Y, edgy.PointA.Z, edgy.PointB.X, edgy.PointB.Y, edgy.PointB.Z);
+                            }
+
+                            UE_LOG(LogTemp, Display, TEXT("Points after 4.3:"));
+                            for (FVector3f point : beam.Points())
+                            {
+                                UE_LOG(LogTemp, Display, TEXT(" - (%f, %f, %f)"), point.X, point.Y, point.Z);
+                            }
+                        }
+                        */
+                    }
+                }
+
+                e = 0;
+            }
+
+            // If this beam plane has had no intersections with the entire clipped surface
+            if (noIntersections)
+            {
+                for (FVector3f point : beam.Points())
+                {
+                    // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
+                    if ( FVector3f::DotProduct( ((point + normal * (approximation + 0.1f)) - planePoint).GetSafeNormal() , normal) < 0 )
+                    {
+                        beamLock.Lock();
+                        _beam++;
+                        beamLock.Unlock();
+
+                        return false;
+                    }
                 }
             }
-        }
-
-        // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
-        if (beam.Points().Num() <= 2 || beam.Edges().Num() <= 2)
-        {
-            beamLock.Lock();
-            _beam++;
-            beamLock.Unlock();
-            
-            return false;
-        }
-
-        // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
-        for (FVector3f point : beam.Points())
-        {
-            for (FVector3f normal : projectionPlanesNormals)
+            else
             {
-                // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
-                if ( FVector3f::DotProduct( (point - parentPos).GetSafeNormal() , normal) < -1 )
+                // If the resulting projection consists of 2 or less points (it's just a line or a point), no IS created
+                if (beam.Points().Num() <= 2 || beam.Edges().Num() <= 2)
                 {
                     beamLock.Lock();
                     _beam++;
@@ -429,9 +765,43 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
                 }
             }
         }
+
+        /*
+        // Checking, for each point resulting from the projection, if it is in the correct semispace of all planes
+        for (FVector3f point : beam.Points())
+        {
+            firstNormal = true;
+            for (FVector3f normal : projectionPlanesNormals)
+            {
+                if (firstNormal)
+                {
+                    planePoint = parentSurface->Points()[0];
+                    firstNormal = false;    
+                }
+                else
+                {
+                    planePoint = parentPos;
+                }
+                
+                // If a point of the projection falls out of a semispace of the projection plane, then no IS is created
+                if ( FVector3f::DotProduct( ((point + normal * (approximation + 0.2f)) - planePoint).GetSafeNormal() , normal) < 0 )
+                {
+                    UE_LOG(LogTemp, Display, TEXT("Node number %i would have been cut"), _nodes.Num());
+                    
+                    //beamLock.Lock();
+                    //_beam++;
+                    //beamLock.Unlock();
+
+                    //return false;
+                    
+                }
+            }
+        }
+        */
     }
 
 
+    
     // 5
     // Projection area check
     if (_cutArea > 0)
@@ -445,6 +815,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
             return false;   
         }
     }
+
 
     
     nodesLock.Lock();
@@ -515,10 +886,10 @@ void IS_Tree::CheckBackSideSurfaces()
                 }
             }
 
-            // If both of the planes of the two surfaces DO NOT intersect the other surface, then each surface is completely on one side of the other 
+            // If one surface is completely on one side of the other, memorize the information to avoid generating IS between them
             if ( isBehind )
             {
-                UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
+                //UE_LOG(LogTemp, Display, TEXT("Found backsided surfaces: %i and %i\n"), _surfaces[i]->ID, _surfaces[j]->ID);
                 
                 TArray<AIS_ReflectorSurface*> iBackSideSurfaces = TArray<AIS_ReflectorSurface*>();
 
@@ -543,14 +914,16 @@ void IS_Tree::CheckBackSideSurfaces()
 
 
 // Given an IS position and the portion of the surface on which it needs to be projected, returns the set of planes passing from the IS to each edge
-TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection)
+TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamProjection BeamProjection, FVector3f surfaceNormal, int parent)
 {
     TArray<FVector3f> normals = TArray<FVector3f>();
+    normals.Add( surfaceNormal );
+    
     for (IS_ReflectorEdge e : BeamProjection.Edges())
     {
-        FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position);
+        FVector3f normal = FVector3f::CrossProduct(e.PointA - position, e.PointB - position).GetSafeNormal();
 
-        normal = CheckNormal(normal, e.PointA, e.PointB, BeamProjection.Points()) ? normal : -normal;
+        normal = CheckNormal(normal, e.PointA, e.PointB, BeamProjection.Points(), parent) ? normal : -normal;
 
         normals.Add(normal);
     }
@@ -561,16 +934,76 @@ TArray<FVector3f> IS_Tree::CreateProjectionPlanes(FVector3f position, IS_BeamPro
 
 
 // Given a vector, an edge and a set of points (forming a convex polygon), checks if said vector is pointing in the direction of all points except those on the edge
-bool IS_Tree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points)
+bool IS_Tree::CheckNormal(FVector3f normal, FVector3f pointA, FVector3f pointB, TArray<FVector3f> points, int parent)
 {
-    for(FVector3f point : points)
+    bool isNormal = true;
+    bool isNegativeNormal = true;
+    
+    for (FVector3f point : points)
     {
-        // Since the polygon forming the surface is convex, it's sufficient to check a single point that doesn't belong to the edge
         if (point != pointA && point != pointB)
-            return FVector3f::DotProduct((point - pointA).GetSafeNormal(), normal) >= 0;
+        {
+            // If a point of the polygon falls out of the edge's semispace
+            if ( FVector3f::DotProduct( (point - pointA).GetSafeNormal() , normal) < 0 )
+            {
+                isNormal = false;
+            }   
+        }
     }
 
-    return true;
+    for (FVector3f point : points)
+    {
+        if (point != pointA && point != pointB)
+        {
+            // If a point of the polygon falls out of the edge's other semispace
+            if ( FVector3f::DotProduct( (point - pointA).GetSafeNormal() , -normal) < 0 )
+            {
+                isNegativeNormal = false;
+            }   
+        }
+    }
+
+    /*
+    if ( isNegativeNormal && isNormal )
+    {
+        UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on both half-planes of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+    }
+    else*/ if ( !isNormal && !isNegativeNormal )
+    {
+        isNormal = true;
+        isNegativeNormal = true;
+    
+        for (FVector3f point : points)
+        {
+            // If a point of the polygon falls out of the edge's semispace
+            if ( FVector3f::DotProduct( ((point + normal * (approximation + 0.1f)) - pointA).GetSafeNormal() , normal) < 0 )
+            {
+                isNormal = false;
+            }
+        }
+
+        for (FVector3f point : points)
+        {
+            // If a point of the polygon falls out of the edge's other semispace
+            if ( FVector3f::DotProduct( ((point - normal * (approximation + 0.1f)) - pointA).GetSafeNormal() , -normal) < 0 )
+            {
+                isNegativeNormal = false;
+            }
+        }
+        
+        /*
+        if (isNormal == isNegativeNormal && isNormal)
+        {
+            UE_LOG(LogTemp, Display, TEXT("The polygon of %i is still on both half-planes of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Display, TEXT("The polygon of %i is on neither half-plane of edge (%f, %f, %f) - (%f, %f, %f)"), parent, pointA.X, pointA.Y, pointA.Z, pointB.X, pointB.Y, pointB.Z);
+        }
+        */
+    }
+
+    return isNormal;
 }
 
 
@@ -589,20 +1022,41 @@ bool IS_Tree::LinePlaneIntersection(FVector3f* intersection, FVector3f linePoint
     {
         float length = dotNumerator / dotDenominator;
 
-        *intersection = linePoint + lineVec.GetSafeNormal() * length;
+        if ( length >= -approximation && length <= lineVec.Length() + approximation )
+        {
+            if (length <= 0)
+                *intersection = linePoint;
+            else if (length >= lineVec.Length())
+                *intersection = linePoint + lineVec;
+            else
+                *intersection = linePoint + lineVec.GetSafeNormal() * length;
 
-        if (length <= 0)
+            return true;
+        }
+        
+        bool closeToA = false;
+        bool closeToB = false;
+
+        if ( FMath::Abs(FVector3f::DotProduct(linePoint - planePoint, planeNormal)) <= approximation )
+        {
             *intersection = linePoint;
-        else if (length >= lineVec.Length())
-            *intersection = linePoint + lineVec;
+            closeToA = true;
+        }
 
-        return length >= -0.02f && length <= lineVec.Length() + 0.02f;
+        if ( FMath::Abs(FVector3f::DotProduct((linePoint + lineVec) - planePoint, planeNormal)) <= approximation )
+        {
+            *intersection = linePoint + lineVec;
+            closeToB = true;
+        }
+        
+        if ( (closeToA && !closeToB) || (!closeToA && closeToB) )
+        {
+            return true;
+        }
     }
-    else
-    {
-        // The line and plane are parallel (no intersection)
-        return false;
-    }
+    
+    // The line and plane are parallel (no intersection)
+    return false;
 }
 
 
