@@ -140,13 +140,13 @@ public:
     UPROPERTY(EditAnywhere)
     bool EnableMultithreading;
 
-    /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
-    UPROPERTY(EditAnywhere)
-    bool WrongSideOfReflector = true;
-
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
     bool PreGenerationBacksideCulling = true;
+
+    /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
+    UPROPERTY(EditAnywhere)
+    bool WrongSideOfReflector = true;
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)

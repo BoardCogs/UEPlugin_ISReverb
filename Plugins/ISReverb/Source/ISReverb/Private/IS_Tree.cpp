@@ -83,7 +83,53 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
                 {
-                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
+                    AIS_ReflectorSurface* childSurface = _surfaces[s];
+                    
+                    // 1
+                    // Checking that no IS is created identifying a reflection on the same surface twice in a row
+                    // This is because a double reflection is impossible assuming flat surfaces
+                    if ( childSurface == nodeSurface )
+                    {
+                        noDoubleLock.Lock();
+                        _noDouble++;
+                        noDoubleLock.Unlock();
+                        
+                        continue;
+                    }
+                    
+                    // 2.0
+                    // Checking that the two surfaces (in their entirety) are not one on the backside of the other
+                    if ( _preBackSideSurfaces )
+                    {
+                        // Checking if the two surfaces are listed together
+                        // Either the parent surface is in the list of this IS's surface
+                        if (_backSideSurfacesList.Contains(childSurface))
+                        {
+                            if (_backSideSurfacesList[childSurface].Contains(nodeSurface))
+                            {
+                                preBackSideLock.Lock();
+                                _preBackSide++;
+                                preBackSideLock.Unlock();
+                                
+                                continue;
+                            }
+                        }
+
+                        // Or this IS's surface is in the list of the parent surface
+                        if (_backSideSurfacesList.Contains(nodeSurface))
+                        {
+                            if (_backSideSurfacesList[nodeSurface].Contains(childSurface))
+                            {
+                                preBackSideLock.Lock();
+                                _preBackSide++;
+                                preBackSideLock.Unlock();
+                                
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    if ( CreateIS(order, p, childSurface, projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
                     {
                         iLock.Lock();
                         i++;
@@ -108,7 +154,47 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                 // Iterates on all surfaces, checking if a new IS can be derived from a reflection of the parent on them
                 for (int s = 0 ; s < _sn ; s++)
                 {
-                    if ( CreateIS(order, p, _surfaces[s], projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
+                    AIS_ReflectorSurface* childSurface = _surfaces[s];
+                    
+                    // 1
+                    // Checking that no IS is created identifying a reflection on the same surface twice in a row
+                    // This is because a double reflection is impossible assuming flat surfaces
+                    if ( childSurface == nodeSurface )
+                    {
+                        _noDouble++;
+                        
+                        continue;
+                    }
+                    
+                    // 2.0
+                    // Checking that the two surfaces (in their entirety) are not one on the backside of the other
+                    if ( _preBackSideSurfaces )
+                    {
+                        // Checking if the two surfaces are listed together
+                        // Either the parent surface is in the list of this IS's surface
+                        if (_backSideSurfacesList.Contains(childSurface))
+                        {
+                            if (_backSideSurfacesList[childSurface].Contains(nodeSurface))
+                            {
+                                _preBackSide++;
+                                
+                                continue;
+                            }
+                        }
+
+                        // Or this IS's surface is in the list of the parent surface
+                        if (_backSideSurfacesList.Contains(nodeSurface))
+                        {
+                            if (_backSideSurfacesList[nodeSurface].Contains(childSurface))
+                            {
+                                _preBackSide++;
+                                
+                                continue;
+                            }
+                        }
+                    }
+                    
+                    if ( CreateIS(order, p, childSurface, projectionPlanesNormals, nodeSurface, nodePos, nodeBeam, nodesLock, noDoubleLock, wrongSideLock, preBackSideLock, midBackSideLock, beamLock, areaLock, realISsLock) )
                         i++;
                 }
             }
@@ -125,12 +211,12 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
                                   "Total number of ISs generated: %i\n"
                                   "Optimizations:\n"
                                   " - No reflection on same surface twice in a row: %i ISs removed\n"
-                                  " - Wrong side of reflector: %i ISs removed\n"
-                                  " - Pre-generation backside surfaces: %i ISs removed\n"
-                                  " - Mid-generation backside surfaces: %i ISs removed\n"
-                                  " - Beam tracing%hs: %i ISs removed\n"
-                                  " - Cut area: %i ISs removed"),
-                                  TimeElapsedInMs, _realISs, _noDouble, _wrongSide, _preBackSide, _midBackSide, (_beamClipping ? " + clipping" : ""), _beam, _area);
+                                  " - Pre-generation backside culling:              %i ISs removed\n"
+                                  " - Wrong side of reflector:                      %i ISs removed\n"
+                                  " - Mid-generation backside culling:              %i ISs removed\n"
+                                  " - Beam tracing%hs                      %i ISs removed\n"
+                                  " - Cut area:                                     %i ISs removed"),
+                                  TimeElapsedInMs, _realISs, _noDouble, _preBackSide, _wrongSide, _midBackSide, (_beamClipping ? " + clipping:" : ":           "), _beam, _area);
 }
 
 
@@ -138,25 +224,9 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
 // This function checks all conditions for creating a new Image Source, then creates it if all are respected
 bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TArray<FVector3f> projectionPlanesNormals, AIS_ReflectorSurface* parentSurface, FVector3f parentPos, IS_BeamProjection parentBeam, FCriticalSection& nodesLock, FCriticalSection& noDoubleLock, FCriticalSection& wrongSideLock, FCriticalSection& preBackSideLock, FCriticalSection& midBackSideLock, FCriticalSection& beamLock, FCriticalSection& areaLock, FCriticalSection& realISsLock)
 {
-	// 1
-    // Checking that no IS is created identifying a reflection on the same surface twice in a row
-    // This is because a double reflection is impossible assuming flat surfaces
-    if ( surface == parentSurface )
-    {
-        noDoubleLock.Lock();
-        _noDouble++;
-        noDoubleLock.Unlock();
-        
-        return false;
-    }
-
-
-    
+    // 3
     // Checking that the created IS would not be on the wrong side of the reflector, standing on the opposite side of the surface's normal
-
     
-
-    // 2
     // Computing the position of the new IS by mirroring its parent along the reflecting surface 
     float d = FVector3f::DotProduct( surface->Normal() , parentPos - surface->Origin() );
     
@@ -176,39 +246,7 @@ bool IS_Tree::CreateIS(int order, int parent, AIS_ReflectorSurface* surface, TAr
 
 
 
-    // 3.0
-    // Checking that the two surfaces (in their entirety) are not one on the backside of the other
-    if ( _preBackSideSurfaces )
-    {
-        // Checking if the two surfaces are listed together
-        // Either the parent surface is in the list of this IS's surface
-        if (_backSideSurfacesList.Contains(surface))
-        {
-            if (_backSideSurfacesList[surface].Contains(parentSurface))
-            {
-                preBackSideLock.Lock();
-                _preBackSide++;
-                preBackSideLock.Unlock();
-                return false;
-            }
-        }
-
-        // Or this IS's surface is in the list of the parent surface
-        if (_backSideSurfacesList.Contains(parentSurface))
-        {
-            if (_backSideSurfacesList[parentSurface].Contains(surface))
-            {
-                preBackSideLock.Lock();
-                _preBackSide++;
-                preBackSideLock.Unlock();
-                return false;
-            }
-        }
-    }
-
-
-
-    // 3.5
+    // 2.5
     // Checking that the clipped parent surface isn't on the backside of the IS's surface
     if ( _midBackSideSurfaces )
     {
