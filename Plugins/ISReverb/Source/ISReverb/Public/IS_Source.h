@@ -162,7 +162,7 @@ public:
 
     /* Beam projections with less area than this are discarded, set to <=0 to disable */
     UPROPERTY(EditAnywhere)
-    float CutArea = 2500;
+    float AreaCulling = 900;
 
     //[Header("Visualization")]
 
