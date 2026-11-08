@@ -819,9 +819,9 @@ void AIS_Source::PlaySound()
 		FHitResult hit;
 		FCollisionQueryParams traceParams;
 
+		// Spawning the original sound
 		if (DrySound && !GetWorld()->LineTraceSingleByChannel(hit, GetTransform().GetLocation(), FVector(ListenerPosition), TraceChannel, traceParams))
 		{
-			// Spawning the original sound
 			UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
 		
 			if (OriginalAudio)
@@ -884,8 +884,8 @@ void AIS_Source::PlaySound()
 		}
 
 		// Spawning sound reflections in clusters
-		FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector().Normalize() );
-		listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0);
+		FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector() );
+		listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0).GetSafeNormal();
 
 		TArray<float> delays;
 		TArray<float> angles;
