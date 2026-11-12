@@ -119,7 +119,7 @@ public:
 
     /* Wheter the dry sound is played or not */
     UPROPERTY(EditAnywhere)
-    bool DrySound = true;
+    bool DirectSound = true;
 
     /* The range of early reflections to be auralized individually */
     UPROPERTY(EditAnywhere)

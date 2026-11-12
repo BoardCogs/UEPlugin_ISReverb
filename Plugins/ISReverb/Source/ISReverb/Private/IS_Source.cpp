@@ -820,7 +820,7 @@ void AIS_Source::PlaySound()
 		FCollisionQueryParams traceParams;
 
 		// Spawning the original sound
-		if (DrySound && !GetWorld()->LineTraceSingleByChannel(hit, GetTransform().GetLocation(), FVector(ListenerPosition), TraceChannel, traceParams))
+		if (DirectSound && !GetWorld()->LineTraceSingleByChannel(hit, GetTransform().GetLocation(), FVector(ListenerPosition), TraceChannel, traceParams))
 		{
 			UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
 		
