@@ -853,7 +853,13 @@ void AIS_Source::PlaySound()
 		
 		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 		{
-			if (i >= IndividualReflections)
+			if (i < AccurateReflectionsMin)
+			{
+				i++;
+				continue;
+			}
+			
+			if (i > AccurateReflectionsMax)
 				break;
 
 			/*
@@ -898,13 +904,13 @@ void AIS_Source::PlaySound()
 		
 		while ( i < SoundRaysFrontBuffer->SoundRays.Num() )
 		{
-			if (i < ClusteredReflectionsMin)
+			if (i < ApproximateReflectionsMin)
 			{
 				i++;
 				continue;
 			}
 
-			if (i >= ClusteredReflectionsMax)
+			if (i > ApproximateReflectionsMax)
 				break;
 
 			delays.Empty();
@@ -920,7 +926,7 @@ void AIS_Source::PlaySound()
 			
 			for (int j = 0 ; j < 10 ; j++, i++)
 			{
-				if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= ClusteredReflectionsMax)
+				if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= ApproximateReflectionsMax)
 				{
 					// Getting vector from listener to IS
 					FVector3f listenerToIS = SoundRaysFrontBuffer->SoundRays[i].ISPosition - ListenerPosition;

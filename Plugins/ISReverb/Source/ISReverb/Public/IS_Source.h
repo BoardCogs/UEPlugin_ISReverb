@@ -121,18 +121,22 @@ public:
     UPROPERTY(EditAnywhere)
     bool DirectSound = true;
 
-    /* The range of early reflections to be auralized individually */
+    /* The beginning (included) of the range of early reflections to be auralized accurately through an ambisonics soundfield*/
     UPROPERTY(EditAnywhere)
-    int IndividualReflections = 0;
+    int AccurateReflectionsMin = 0;
 
-    /* The beginning (included) of the range of early reflections to auralize in clusters.
+    /* The end (included) of the range of early reflections to be auralized accurately through an ambisonics soundfield*/
+    UPROPERTY(EditAnywhere)
+    int AccurateReflectionsMax = 20;
+
+    /* The beginning (included) of the range of early reflections to auralize approximately with panning.
      * If it overlaps with IndividualReflections, the first reflections are auralized individually. */
     UPROPERTY(EditAnywhere)
-    int ClusteredReflectionsMin = 0;
+    int ApproximateReflectionsMin = 0;
 
-    /* The end (included) of the range of early reflections to auralize in clusters */
+    /* The end (included) of the range of early reflections to auralize approximately with panning */
     UPROPERTY(EditAnywhere)
-    int ClusteredReflectionsMax = 200;
+    int ApproximateReflectionsMax = 300;
 
     //[Header("Optimizations")]
     
