@@ -142,7 +142,7 @@ public:
     
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
-    bool EnableMultithreading;
+    bool EnableMultithreading = true;
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
