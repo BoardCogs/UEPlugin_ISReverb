@@ -15,6 +15,7 @@ class ISREVERB_API AIS_Listener : public AIS_RoomTracker
 	GENERATED_BODY()
 
 public:
+	/* The room(s) the listener is occupying */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FString Room;
 	

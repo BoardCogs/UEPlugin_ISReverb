@@ -30,15 +30,20 @@ protected:
 
 public:
 	// Properties
+
+	/* The room's name, which will be visualized by the sources and listener that are in them */
 	UPROPERTY(EditAnywhere)
 	FString Name;
 
+	/* Sets the visibility of surfaces assigned to the room. Only works during execution */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool VisibleSurfaces = false;
 
+	/* The list of surfaces assigned to this room and used to model it. Filled automatically during execution */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	TArray<AIS_ReflectorSurface*> Surfaces;
-	
+
+	/* The number of surfaces assigned to this room. Filled automatically during execution */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	int SurfaceNumber;
 

@@ -178,7 +178,7 @@ TFuture<IS_Tree> AIS_Source::CreateISTreeTask(TArray<AIS_Room*> listenerRooms, F
 
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, listenerRooms, position, parallelExecution, Promise]() mutable
 	{
-		IS_Tree tree = IS_Tree(Order, position, listenerRooms, parallelExecution, WrongSideOfReflector, PreGenerationBacksideCulling, MidGenerationBacksideCulling, BeamTracing, BeamClipping, CutArea);
+		IS_Tree tree = IS_Tree(Order, position, listenerRooms, parallelExecution, WrongSideOfReflector, PreGenerationBacksideCulling, MidGenerationBacksideCulling, BeamTracing, BeamClipping, AreaCulling);
 		Promise->SetValue(tree);
 	});
 
@@ -819,9 +819,9 @@ void AIS_Source::PlaySound()
 		FHitResult hit;
 		FCollisionQueryParams traceParams;
 
-		if (DrySound && !GetWorld()->LineTraceSingleByChannel(hit, GetTransform().GetLocation(), FVector(ListenerPosition), TraceChannel, traceParams))
+		// Spawning the original sound
+		if (DirectSound && !GetWorld()->LineTraceSingleByChannel(hit, GetTransform().GetLocation(), FVector(ListenerPosition), TraceChannel, traceParams))
 		{
-			// Spawning the original sound
 			UAudioComponent* OriginalAudio = UGameplayStatics::SpawnSoundAttached(SoundEmitter, this->RootComponent, NAME_None, FVector::Zero(), FRotator::ZeroRotator, EAttachLocation::KeepRelativeOffset, true, 1, 1, 0, SoundAttenuation);
 		
 			if (OriginalAudio)
@@ -853,7 +853,13 @@ void AIS_Source::PlaySound()
 		
 		for (IS_SoundRay ray : SoundRaysFrontBuffer->SoundRays)
 		{
-			if (i >= IndividualReflections)
+			if (i < AccurateReflectionsMin)
+			{
+				i++;
+				continue;
+			}
+			
+			if (i > AccurateReflectionsMax)
 				break;
 
 			/*
@@ -884,8 +890,8 @@ void AIS_Source::PlaySound()
 		}
 
 		// Spawning sound reflections in clusters
-		FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector().Normalize() );
-		listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0);
+		FVector3f listenerRight = FVector3f (GetListener()->GetActorRightVector() );
+		listenerRight = FVector3f(listenerRight.X, listenerRight.Y, 0.0).GetSafeNormal();
 
 		TArray<float> delays;
 		TArray<float> angles;
@@ -898,13 +904,13 @@ void AIS_Source::PlaySound()
 		
 		while ( i < SoundRaysFrontBuffer->SoundRays.Num() )
 		{
-			if (i < ClusteredReflectionsMin)
+			if (i < ApproximateReflectionsMin)
 			{
 				i++;
 				continue;
 			}
 
-			if (i >= ClusteredReflectionsMax)
+			if (i > ApproximateReflectionsMax)
 				break;
 
 			delays.Empty();
@@ -920,7 +926,7 @@ void AIS_Source::PlaySound()
 			
 			for (int j = 0 ; j < 10 ; j++, i++)
 			{
-				if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= ClusteredReflectionsMax)
+				if (i < SoundRaysFrontBuffer->SoundRays.Num() && i <= ApproximateReflectionsMax)
 				{
 					// Getting vector from listener to IS
 					FVector3f listenerToIS = SoundRaysFrontBuffer->SoundRays[i].ISPosition - ListenerPosition;

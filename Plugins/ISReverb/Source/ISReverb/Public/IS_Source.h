@@ -119,34 +119,38 @@ public:
 
     /* Wheter the dry sound is played or not */
     UPROPERTY(EditAnywhere)
-    bool DrySound = true;
+    bool DirectSound = true;
 
-    /* The range of early reflections to be auralized individually */
+    /* The beginning (included) of the range of early reflections to be auralized accurately through an ambisonics soundfield*/
     UPROPERTY(EditAnywhere)
-    int IndividualReflections = 0;
+    int AccurateReflectionsMin = 0;
 
-    /* The beginning (included) of the range of early reflections to auralize in clusters.
+    /* The end (included) of the range of early reflections to be auralized accurately through an ambisonics soundfield*/
+    UPROPERTY(EditAnywhere)
+    int AccurateReflectionsMax = 20;
+
+    /* The beginning (included) of the range of early reflections to auralize approximately with panning.
      * If it overlaps with IndividualReflections, the first reflections are auralized individually. */
     UPROPERTY(EditAnywhere)
-    int ClusteredReflectionsMin = 0;
+    int ApproximateReflectionsMin = 0;
 
-    /* The end (included) of the range of early reflections to auralize in clusters */
+    /* The end (included) of the range of early reflections to auralize approximately with panning */
     UPROPERTY(EditAnywhere)
-    int ClusteredReflectionsMax = 200;
+    int ApproximateReflectionsMax = 300;
 
     //[Header("Optimizations")]
     
     /* Set to true to enable using multithreading on CPU-heavy computations (recommended) */
     UPROPERTY(EditAnywhere)
-    bool EnableMultithreading;
-
-    /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
-    UPROPERTY(EditAnywhere)
-    bool WrongSideOfReflector = true;
+    bool EnableMultithreading = true;
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
     bool PreGenerationBacksideCulling = true;
+
+    /* Set true to remove all ISs that fall on the front side of their reflecting surface (recommended) */
+    UPROPERTY(EditAnywhere)
+    bool WrongSideOfReflector = true;
 
     /* Set true to check for surfaces that face away from each other before IS generation and avoid testing them for ISs (recommended) */
     UPROPERTY(EditAnywhere)
@@ -162,7 +166,7 @@ public:
 
     /* Beam projections with less area than this are discarded, set to <=0 to disable */
     UPROPERTY(EditAnywhere)
-    float CutArea = 2500;
+    float AreaCulling = 900;
 
     //[Header("Visualization")]
 
