@@ -5,12 +5,14 @@ This Unreal Plugin aims at graphically representing reverb in a room by using th
 ## Description
 
 Given the surfaces of a room and the positons of source and listener, sound reflectons are represented by Image Sources (ISs).
-ISs are clones of the original source that simulate the original sound being heard by the listener from different directions because of reverberation. Specifically, they used to compute the paths followed by sound rays inside the room. Sound rays, in turn, serve to approximate with acceptable accuracy the behaviour of soundwaves.
+ISs are clones of the original source that simulate the original sound being heard by the listener from different directions because of reverberation. Specifically, they are used to compute the paths followed by sound rays inside the room. Sound rays, in turn, serve to approximate with acceptable accuracy the behaviour of sound waves.
 
-The focus of this project is the generation of ISs and the validation of reflection paths for their sound rays, with special attention to implementing different opmizations to drastically cut time costs and achieve real-time computations. The simulation aslo allows to dinamically enable or disable different optimizations independently, as well as multithreading, for benchmarking.
+The focus of this project is the generation of ISs and the validation of reflection paths for their sound rays, with special attention to implementing different opmizations to drastically cut time costs and achieve real-time computation. The simulation also allows the user the possibility of dinamically disabling different optimizations independently, as well as multithreading, for benchmarking.
+The project also acts as a framework for the development of a complete artificial reverberator, implementing a system for the real-time auralization of the first few hundred reflection paths by encoding sound signals in Ambisonics format or by panning them withr espect to the listener.
+Finally, this project offers a unique view of the scene that highlights the reflective properties of the surfaces used by the simulation, as well as an accurate visualization of the computed reflection paths and their frequency composition and intensity as they travel in the reverberant environment.
 
 For the full process and algorithms implemented in this simulation, refer to the [official documentation](/ISReverbDocumentation.pdf) inside this folder.
-Please note that the documentation describes the method theoretically, but may still contain references to the Unity Game Engine, instead of the Unreal Engine. This is because this plugin is a full porting of a [previous Unity project](https://github.com/BoardCogs/ISReverb), adding multithreading.
+Please note that the documentation describes the method theoretically, but may still contain references to the Unity Game Engine, instead of the Unreal Engine. This is because this plugin is a full porting of a [previous Unity project](https://github.com/BoardCogs/ISReverb), adding multithreadingl, visualization and auralization.
 
 ## Getting Started
 
