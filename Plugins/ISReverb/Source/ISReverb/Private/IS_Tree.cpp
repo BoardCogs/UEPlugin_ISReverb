@@ -44,7 +44,7 @@ IS_Tree::IS_Tree(int r, FVector3f sourcePos, TArray<AIS_Room*> rooms, bool paral
 
         FVector3f pos = sourcePos - 2 * d * _surfaces[i]->Normal();
 
-        _nodes.Add( IS( i, 1, -1, pos, _surfaces[i], IS_BeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
+        _nodes.Add( IS( _realISs, 1, -1, pos, _surfaces[i], IS_BeamProjection( _surfaces[i]->Points() , _surfaces[i]->Edges() ) ) );
         _realISs++;
     }
 
